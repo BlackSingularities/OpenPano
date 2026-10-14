@@ -3,6 +3,7 @@
   "identifier": "default",
   "description": "Main window permissions",
   "windows": ["main"],
+  "platforms": ["windows", "linux", "macOS", "android", "iOS"],
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
@@ -11,6 +12,10 @@
     "dialog:default",
     "opener:default",
     "opener:allow-open-url",
-    "opener:allow-reveal-item-in-dir"
+    "opener:allow-reveal-item-in-dir",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    { "identifier": "fs:scope", "allow": [{ "path": "**" }] }
   ]
 }

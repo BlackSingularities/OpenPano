@@ -16,7 +16,7 @@
     gap: 10px;
   }
   .lbl.help {
-    text-decoration: underline dotted rgba(255, 255, 255, 0.25);
+    text-decoration: underline dotted rgba(var(--fg-rgb), 0.25);
     text-underline-offset: 3px;
     cursor: help;
   }

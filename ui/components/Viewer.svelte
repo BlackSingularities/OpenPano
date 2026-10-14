@@ -5,7 +5,8 @@
   import { SphereRenderer } from "../lib/gl";
   import { wraps, forward, inverse, lensRay, level, largestRect, mul, solveGrab, transpose, ypr, yawPitchTowards, type V3 } from "../lib/geometry";
   import { t } from "../lib/i18n.svelte";
-  import { S, app, vw, fitView, viewChanged, commitHistory, undo, redo, canUndo, canRedo, persist, type Tool } from "../lib/store.svelte";
+  import { canvasBg } from "../lib/theme";
+  import { themeState, S, app, vw, fitView, viewChanged, commitHistory, undo, redo, canUndo, canRedo, persist, type Tool } from "../lib/store.svelte";
 
   let host: HTMLDivElement;
   let canvas: HTMLCanvasElement;
@@ -98,15 +99,15 @@
       uploadedVersion = -1;
     }
     if (!rect || !bounds) {
-      renderer.draw({ originX: 0, originY: 0, k: 1, bounds: [0, 0, 1, 1], projection: proj, R, flipH: false, flipV: false, dpr });
+      renderer.draw({ originX: 0, originY: 0, k: 1, bounds: [0, 0, 1, 1], projection: proj, R, flipH: false, flipV: false, dpr, bg: canvasBg() });
       return;
     }
-    renderer.draw({ originX: rect.x * dpr, originY: rect.y * dpr, k: rect.k * dpr, bounds, projection: proj, R, flipH: r.flip_h, flipV: r.flip_v, dpr });
+    renderer.draw({ originX: rect.x * dpr, originY: rect.y * dpr, k: rect.k * dpr, bounds, projection: proj, R, flipH: r.flip_h, flipV: r.flip_v, dpr, bg: canvasBg() });
   }
 
   $effect(() => {
     // dependencies
-    void [rect, bounds, R, proj, r.flip_h, r.flip_v, app.sphere, W, H, dpr];
+    void [rect, bounds, R, proj, r.flip_h, r.flip_v, app.sphere, W, H, dpr, themeState.version];
     schedule();
   });
 
@@ -267,10 +268,31 @@
     viewChanged();
   }
 
+  // ---- multi-touch: pinch zoom + two-finger roll
+  const touches = new Map<number, { x: number; y: number }>();
+  let pinch: { d0: number; a0: number; zoom0: number; roll0: number; cx: number; cy: number; px: number; py: number } | null = null;
+
+  function pinchState() {
+    const [a, b] = [...touches.values()];
+    return { d: Math.hypot(b.x - a.x, b.y - a.y), a: Math.atan2(b.y - a.y, b.x - a.x), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+  }
+
   function onPointerDown(e: PointerEvent) {
     if (!rect || !bounds) return;
     host.setPointerCapture(e.pointerId);
     const p = local(e);
+    if (e.pointerType === "touch") {
+      touches.set(e.pointerId, p);
+      if (touches.size === 2) {
+        if (drag && (drag.kind === "grab" || drag.kind === "roll")) endInteraction();
+        drag = null;
+        const st = pinchState();
+        startInteraction();
+        pinch = { d0: st.d, a0: st.a, zoom0: vw.zoom, roll0: r.roll, cx: st.cx, cy: st.cy, px: vw.panX, py: vw.panY };
+        return;
+      }
+      if (touches.size > 2) return;
+    }
     downAt = p;
     moved = false;
     const tool: Tool = vw.tool;
@@ -306,7 +328,20 @@
 
   function onPointerMove(e: PointerEvent) {
     const p = local(e);
-    hover = p;
+    if (e.pointerType === "touch" && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, p);
+      if (pinch && touches.size === 2) {
+        const st = pinchState();
+        vw.zoom = Math.min(40, Math.max(0.2, (pinch.zoom0 * st.d) / Math.max(1, pinch.d0)));
+        vw.panX = pinch.px + (st.cx - pinch.cx);
+        vw.panY = pinch.py + (st.cy - pinch.cy);
+        const sign = r.flip_h !== r.flip_v ? -1 : 1;
+        let v = pinch.roll0 - (sign * ((st.a - pinch.a0) * 180)) / Math.PI;
+        r.roll = ((((v + 180) % 360) + 360) % 360) - 180;
+        return;
+      }
+    }
+    if (e.pointerType !== "touch") hover = p;
     if (!drag || !rect) return;
     if (downAt && Math.hypot(p.x - downAt.x, p.y - downAt.y) > 3) moved = true;
     switch (drag.kind) {
@@ -358,6 +393,18 @@
 
   function onPointerUp(e: PointerEvent) {
     const p = local(e);
+    if (e.pointerType === "touch") {
+      touches.delete(e.pointerId);
+      if (pinch) {
+        if (touches.size < 2) {
+          pinch = null;
+          endInteraction();
+        }
+        moved = true;
+        drag = null;
+        return;
+      }
+    }
     const d = drag;
     drag = null;
     if (d && (d.kind === "grab" || d.kind === "roll")) endInteraction();
@@ -545,6 +592,7 @@
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
+    onpointercancel={onPointerUp}
     onpointerleave={() => (hover = null)}
     onwheel={onWheel}
     ondblclick={() => (vw.tool === "rotate" || vw.tool === "pan") && fitView()}
@@ -641,10 +689,12 @@
     align-items: center;
     gap: 4px;
     padding: 7px 10px;
-    background: var(--panel);
+    background: var(--surface);
     border-bottom: 1px solid var(--line);
     flex-wrap: nowrap;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
   }
   .sep {
     width: 1px;
@@ -667,11 +717,17 @@
       display: none;
     }
   }
+  @container (max-width: 640px) {
+    .hud-bl > span:not(.coord),
+    .hud-br {
+      display: none;
+    }
+  }
   .stage {
     position: relative;
     flex: 1;
     overflow: hidden;
-    background: radial-gradient(ellipse at center, #171a21 0%, #111318 75%);
+    background: var(--surface);
     touch-action: none;
   }
   canvas {
@@ -687,42 +743,43 @@
   }
   .g {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.16);
+    stroke: rgba(var(--fg-rgb), 0.16);
     stroke-width: 1;
   }
   .gm {
     fill: none;
-    stroke: rgba(91, 155, 255, 0.55);
+    stroke: rgba(var(--fg-rgb), 0.4);
     stroke-width: 1;
   }
   .gh {
     fill: none;
-    stroke: rgba(255, 170, 60, 0.85);
+    stroke: rgba(var(--fg-rgb), 0.9);
     stroke-width: 1.5;
+    stroke-dasharray: 8 5;
   }
   .ol {
     fill: none;
-    stroke: rgba(120, 180, 255, 0.85);
-    stroke-width: 1.3;
+    stroke: rgba(var(--fg-rgb), 0.55);
+    stroke-width: 1.2;
   }
   .ol.sel {
     stroke: var(--accent);
     stroke-width: 2.6;
   }
   .olc {
-    fill: rgba(10, 12, 16, 0.75);
-    stroke: rgba(120, 180, 255, 0.85);
+    fill: var(--surface);
+    stroke: rgba(var(--fg-rgb), 0.55);
   }
   .olc.sel {
     stroke: var(--accent);
   }
   .olt {
-    fill: #fff;
+    fill: var(--sel-bg);
     font-size: 11px;
     font-weight: 600;
   }
   .shade {
-    fill: rgba(5, 6, 9, 0.62);
+    fill: rgba(var(--bg-rgb), 0.7);
   }
   .crop {
     fill: none;
@@ -733,16 +790,16 @@
     stroke-width: 2;
   }
   .third {
-    stroke: rgba(255, 255, 255, 0.28);
+    stroke: rgba(var(--fg-rgb), 0.28);
     stroke-width: 1;
   }
   .handle {
-    fill: var(--accent);
-    stroke: #1b1306;
+    fill: var(--sel-bg);
+    stroke: var(--surface);
     stroke-width: 1;
   }
   .pt {
-    fill: rgba(255, 170, 60, 0.25);
+    fill: rgba(var(--fg-rgb), 0.2);
     stroke: var(--accent);
     stroke-width: 2;
   }
@@ -758,7 +815,7 @@
     transform: translate(-50%, -50%);
     padding: 12px 18px;
     border-radius: var(--radius);
-    background: rgba(20, 22, 28, 0.9);
+    background: rgba(var(--bg-rgb), 0.92);
     border: 1px solid var(--line-2);
     max-width: 70%;
     text-align: center;
@@ -775,7 +832,7 @@
     gap: 9px;
     padding: 8px 12px;
     border-radius: 20px;
-    background: rgba(20, 22, 28, 0.9);
+    background: rgba(var(--bg-rgb), 0.92);
     border: 1px solid var(--line-2);
     box-shadow: var(--shadow);
     font-size: 12px;
@@ -784,7 +841,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(var(--fg-rgb), 0.15);
     border-top-color: var(--accent);
     animation: spin 0.8s linear infinite;
   }
@@ -800,7 +857,7 @@
     transform: translateX(-50%);
     padding: 7px 14px;
     border-radius: 20px;
-    background: rgba(12, 14, 18, 0.85);
+    background: rgba(var(--bg-rgb), 0.9);
     border: 1px solid var(--line-2);
     font-variant-numeric: tabular-nums;
     color: var(--text-2);
@@ -818,7 +875,8 @@
     align-items: center;
     padding: 6px 11px;
     border-radius: 8px;
-    background: rgba(12, 14, 18, 0.72);
+    background: rgba(var(--bg-rgb), 0.85);
+    border: 1px solid var(--line);
     color: var(--text-2);
     font-size: 12px;
     pointer-events: none;

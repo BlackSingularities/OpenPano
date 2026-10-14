@@ -81,25 +81,81 @@ pub fn system_language() -> String {
     }
 }
 
-fn settings_path() -> Option<PathBuf> {
-    directories::ProjectDirs::from("com", "redzikowski", "Panoramer").map(|d| d.config_dir().join("settings.json"))
+fn settings_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("settings.json"))
 }
 
 #[tauri::command]
-pub fn load_settings() -> serde_json::Value {
-    settings_path()
+pub fn load_settings(app: AppHandle) -> serde_json::Value {
+    settings_path(&app)
         .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or(serde_json::Value::Null)
 }
 
 #[tauri::command]
-pub fn save_settings(settings: serde_json::Value) -> Res<()> {
-    let p = settings_path().ok_or("no config dir")?;
+pub fn save_settings(app: AppHandle, settings: serde_json::Value) -> Res<()> {
+    let p = settings_path(&app).ok_or("no config dir")?;
     if let Some(d) = p.parent() {
         std::fs::create_dir_all(d).map_err(err)?;
     }
     std::fs::write(p, serde_json::to_string_pretty(&settings).map_err(err)?).map_err(err)
+}
+
+/// Writable cache directory (used on mobile for imported files and rendered output).
+#[tauri::command]
+pub fn cache_dir(app: AppHandle) -> Res<String> {
+    let d = app.path().app_cache_dir().map_err(err)?;
+    std::fs::create_dir_all(&d).map_err(err)?;
+    Ok(d.to_string_lossy().to_string())
+}
+
+/// Import an image sent as raw bytes (mobile content URIs). Header `x-name` carries the file
+/// name. The file is stored in the cache directory and loaded like a normal path.
+#[tauri::command]
+pub fn add_image_bytes(app: AppHandle, state: State<'_, Shared>, request: tauri::ipc::Request<'_>) -> Res<Vec<Added>> {
+    let name = request
+        .headers()
+        .get("x-name")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| percent_decode(s))
+        .unwrap_or_else(|| "image.jpg".into());
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("expected raw body".into()) };
+    let dir = app.path().app_cache_dir().map_err(err)?.join("import");
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' }).collect();
+    let mut path = dir.join(&safe);
+    let mut k = 1;
+    while path.exists() {
+        path = dir.join(format!("{k}_{safe}"));
+        k += 1;
+    }
+    std::fs::write(&path, bytes).map_err(err)?;
+    Ok(register_and_load(&app, &state, vec![path]))
+}
+
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).to_string()
+}
+
+/// Raw bytes of a file (used on mobile to copy rendered output to a user-chosen location).
+#[tauri::command]
+pub fn read_file_bytes(path: String) -> Res<tauri::ipc::Response> {
+    Ok(tauri::ipc::Response::new(std::fs::read(path).map_err(err)?))
 }
 
 #[tauri::command]
@@ -155,6 +211,10 @@ fn thumb_data_url(w: &WorkImage) -> String {
 pub fn add_images(app: AppHandle, state: State<'_, Shared>, paths: Vec<String>) -> Vec<Added> {
     let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
     let paths = panoramer_core::loader::expand_paths(&paths);
+    register_and_load(&app, &state, paths)
+}
+
+fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Vec<Added> {
     let mut added = Vec::new();
     {
         let mut g = state.inner.lock().unwrap();
@@ -176,7 +236,7 @@ pub fn add_images(app: AppHandle, state: State<'_, Shared>, paths: Vec<String>) 
         return added;
     }
     let jobs: Vec<(u32, PathBuf)> = added.iter().map(|a| (a.id, PathBuf::from(&a.path))).collect();
-    let (_p, cancel, done) = begin_job(&app, &state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageLoading));
+    let (_p, cancel, done) = begin_job(app, state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageLoading));
     let app2 = app.clone();
     std::thread::spawn(move || {
         use rayon::prelude::*;

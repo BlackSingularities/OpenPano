@@ -40,9 +40,14 @@ Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne
 - **Tryb wiersza poleceń** do pracy wsadowej.
 
 ### Instalacja
-Pobierz z [Releases](https://github.com/BlackSingularities/Panoramer/releases/latest) jeden z plików:
-- `Panoramer-x.y.z-setup-x64.exe` (instalator),
-- `…-portable-x64.exe` (wersja przenośna, bez instalacji).
+Pobierz z [Releases](https://github.com/BlackSingularities/Panoramer/releases/latest):
+- **Windows:** `Panoramer-x.y.z-setup-x64.exe` (instalator PL/EN) lub `…-portable-x64.exe` (bez instalacji),
+- **Android:** `Panoramer-x.y.z-android.apk` (Android 8.0+). Otwórz plik i zezwól na instalację z tego źródła,
+- **iOS:** `Panoramer-x.y.z-ios-unsigned.ipa`. Plik nie jest podpisany (wymaga to konta Apple Developer); zainstaluj go przez AltStore lub Sideloadly, które podpiszą go Twoim Apple ID.
+
+### Motywy
+- **Telefon:** ciemny (AMOLED) i jasny.
+- **Komputer:** ciemny, jasny, szary, klasyczny (grafit + pomarańcz) oraz dowolny kolor RGB. Tekst i ikony automatycznie przełączają się na czarne lub białe dla kontrastu.
 
 ### Jak używać
 1. Dodaj zdjęcia (przycisk albo przeciągnij pliki/folder do okna).

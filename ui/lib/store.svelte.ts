@@ -4,9 +4,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { readFile, writeFile } from "@tauri-apps/plugin-fs";
+
+export const IS_MOBILE = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 import type { LensType, Projection } from "./geometry";
 import { setLang, t, type Lang } from "./i18n.svelte";
 import type { SphereMeta } from "./gl";
+import { applyTheme, THEMES, type ThemeId } from "./theme";
 
 export type CropMode = "Auto" | "None" | "Manual";
 export type Blend = "Multiband" | "Feather" | "Seams";
@@ -49,7 +53,7 @@ export interface Settings {
   photo: { exposure: boolean; color: boolean; vignetting: boolean };
   render: RenderSettings;
   output: { format: OutFormat; jpeg_quality: number; transparent: boolean; gpano: boolean };
-  ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean };
+  ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string };
 }
 
 export const defaultRender = (): RenderSettings => ({
@@ -77,9 +81,9 @@ const defaults = (): Settings => ({
   manualFov: false,
   fovDeg: 60,
   photo: { exposure: true, color: true, vignetting: true },
-  render: defaultRender(),
+  render: { ...defaultRender(), max_megapixels: IS_MOBILE ? 60 : 300 },
   output: { format: "Auto", jpeg_quality: 95, transparent: false, gpano: true },
-  ui: { showGrid: true, showOutlines: false, showNav: true, quality: "normal", revealAfter: true },
+  ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44" },
 });
 
 export interface ImageItem {
@@ -218,6 +222,7 @@ export async function init() {
   // a new session always starts with a neutral view
   Object.assign(s.render, { yaw: 0, pitch: 0, roll: 0, flip_h: false, flip_v: false, crop: s.render.crop === "Manual" ? "Auto" : s.render.crop });
   S.settings = s;
+  setTheme(s.ui.theme, s.ui.customColor, false);
   setLang(s.lang);
   await invoke("set_language", { lang: s.lang });
 
@@ -252,6 +257,17 @@ export async function init() {
   app.ready = true;
 }
 
+export const themeState = $state({ version: 0 });
+
+export function setTheme(id: ThemeId, custom?: string, save = true) {
+  if (IS_MOBILE && THEMES.find((x) => x.id === id)?.desktopOnly) id = "dark";
+  S.settings.ui.theme = id;
+  if (custom) S.settings.ui.customColor = custom;
+  applyTheme(id, S.settings.ui.customColor);
+  themeState.version++;
+  if (save) persist();
+}
+
 export function setLanguage(l: Lang) {
   S.settings.lang = l;
   setLang(l);
@@ -278,7 +294,34 @@ export async function addPaths(paths: string[]) {
   app.job = { kind: "load", stage: t("stageLoading"), fraction: 0, started: Date.now() };
 }
 
+function fileName(uri: string): string {
+  const s = decodeURIComponent(uri.split(/[\\/]/).pop() ?? "image");
+  return s.includes(":") ? s.split(":").pop()! : s;
+}
+
+/** Mobile: content URIs are read in the UI and streamed to the engine as raw bytes. */
+async function importUris(uris: string[]) {
+  if (app.job && app.job.kind !== "load" && app.job.kind !== "sphere") return;
+  app.job = { kind: "load", stage: t("stageLoading"), fraction: 0, started: Date.now() };
+  for (const [i, uri] of uris.entries()) {
+    try {
+      const bytes = await readFile(uri);
+      const added = await invoke<{ id: number; path: string; name: string }[]>("add_image_bytes", bytes, { headers: { "x-name": encodeURIComponent(fileName(uri)) } });
+      for (const a of added) app.images.push({ ...a, status: "loading", width: 0, height: 0, isRaw: false, summary: "", camera: "", thumb: "", enabled: true });
+      invalidateAlignment();
+    } catch (e) {
+      toast(`${fileName(uri)}: ${e}`, "error");
+    }
+    if (app.job) app.job.fraction = (i + 1) / uris.length;
+  }
+}
+
 export async function pickFiles() {
+  if (IS_MOBILE) {
+    const r = await open({ multiple: true, filters: [{ name: "Images", extensions: IMAGE_EXT }] });
+    if (r) importUris(Array.isArray(r) ? r : [r]);
+    return;
+  }
   const r = await open({ multiple: true, filters: [{ name: "Images / RAW", extensions: [...IMAGE_EXT, ...IMAGE_EXT.map((e) => e.toUpperCase())] }] });
   if (r) addPaths(Array.isArray(r) ? r : [r]);
 }
@@ -462,6 +505,7 @@ export async function renderAndSave() {
   const first = app.images.find((x) => x.id === app.alignedIds[0]);
   const base = first ? first.name.replace(/\.[^.]+$/, "") + "_pano" : "panorama";
   const dir = first ? first.path.replace(/[\\/][^\\/]*$/, "") : undefined;
+  if (IS_MOBILE) return renderMobile(base, fmt);
   const path = await save({
     defaultPath: dir ? `${dir}\\${base}.${EXT[fmt]}` : `${base}.${EXT[fmt]}`,
     filters: [{ name: fmt.replace("16", ""), extensions: fmt === "Jpeg" ? ["jpg", "jpeg"] : fmt === "Tiff16" ? ["tif", "tiff"] : [EXT[fmt]] }],
@@ -481,6 +525,34 @@ export async function renderAndSave() {
     if (S.settings.ui.revealAfter) reveal(r.path);
   } catch (e: any) {
     log(`${t("renderFailed")}: ${e}`, true);
+    toast(`${t("renderFailed")}: ${e}`, "error");
+  } finally {
+    app.job = null;
+  }
+}
+
+/** Mobile: render into the cache, then copy to a location chosen in the system dialog. */
+async function renderMobile(base: string, fmt: Exclude<OutFormat, "Auto">) {
+  if (app.job?.kind === "sphere") await invoke("cancel_job");
+  const cache = await invoke<string>("cache_dir");
+  const tmp = `${cache}/${base}.${EXT[fmt]}`;
+  const render = $state.snapshot(S.settings.render);
+  const output = { ...$state.snapshot(S.settings.output), format: fmt };
+  const snap = viewSnapshot();
+  app.job = { kind: "render", stage: "", fraction: 0, started: Date.now() };
+  try {
+    const r = await invoke<{ path: string; width: number; height: number; seconds: number }>("render_and_save", { path: tmp, render, output });
+    app.job = null;
+    const dest = await save({ defaultPath: `${base}.${EXT[fmt]}`, filters: [{ name: fmt, extensions: [EXT[fmt]] }] }).catch(() => null);
+    if (dest) {
+      const buf = await invoke<ArrayBuffer>("read_file_bytes", { path: tmp });
+      await writeFile(dest, new Uint8Array(buf));
+      app.exportedSnapshot = snap;
+      toast(`${t("saved")}: ${r.width}×${r.height} · ${r.seconds.toFixed(1)} s`, "ok");
+    } else {
+      toast(`${t("saved")}: ${tmp}`, "info");
+    }
+  } catch (e: any) {
     toast(`${t("renderFailed")}: ${e}`, "error");
   } finally {
     app.job = null;

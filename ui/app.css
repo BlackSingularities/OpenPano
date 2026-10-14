@@ -1,30 +1,37 @@
 :root {
-  --bg: #111318;
-  --bg-2: #161920;
-  --panel: #1a1d25;
-  --panel-2: #20242e;
-  --raised: #262b37;
-  --raised-2: #2e3442;
-  --line: #2c313d;
-  --line-2: #3a4150;
-  --text: #e8ebf2;
-  --text-2: #aeb5c4;
-  --text-3: #7a8293;
-  --accent: #ffaa3c;
-  --accent-2: #ffc26e;
-  --accent-ink: #1b1306;
-  --accent-soft: rgba(255, 170, 60, 0.14);
-  --blue: #5b9bff;
-  --blue-soft: rgba(91, 155, 255, 0.16);
-  --ok: #5fd08a;
-  --warn: #ffc14d;
-  --err: #ff6b6b;
-  --radius: 10px;
-  --radius-sm: 7px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  /* Theme tokens – overwritten at runtime by ui/lib/theme.ts */
+  --bg: #000000;
+  --bg-2: #000000;
+  --panel: #000000;
+  --panel-2: #000000;
+  --surface: #000000;
+  --raised: #0d0d0d;
+  --raised-2: #1a1a1a;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-2: rgba(255, 255, 255, 0.24);
+  --text: #ffffff;
+  --text-2: rgba(255, 255, 255, 0.72);
+  --text-3: rgba(255, 255, 255, 0.42);
+  --fg-rgb: 255, 255, 255;
+  --bg-rgb: 0, 0, 0;
+  --accent: #ffffff;
+  --accent-2: #ffffff;
+  --accent-ink: #000000;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --sel-bg: #ffffff;
+  --sel-fg: #000000;
+  --sel-hover: #e6e6e6;
+  --blue: #ffffff;
+  --blue-soft: rgba(255, 255, 255, 0.14);
+  --ok: #ffffff;
+  --warn: #ffd34d;
+  --err: #ff3b47;
+  --radius: 18px;
+  --radius-sm: 999px;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --mono: "Cascadia Mono", "Consolas", ui-monospace, "Roboto Mono", monospace;
   color-scheme: dark;
 }
 
@@ -56,13 +63,13 @@ button {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2f3542;
+  background: rgba(var(--fg-rgb), 0.16);
   border-radius: 10px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #424a5c;
+  background: rgba(var(--fg-rgb), 0.3);
   background-clip: padding-box;
   border: 3px solid transparent;
 }
@@ -80,7 +87,7 @@ button {
   padding: 0 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-2);
-  background: var(--raised);
+  background: var(--surface);
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
@@ -88,7 +95,7 @@ button {
 }
 .btn:hover:not(:disabled) {
   background: var(--raised-2);
-  border-color: #4a5366;
+  border-color: rgba(var(--fg-rgb), 0.45);
 }
 .btn:active:not(:disabled) {
   transform: translateY(1px);
@@ -98,23 +105,24 @@ button {
   cursor: default;
 }
 .btn.primary {
-  background: linear-gradient(180deg, #ffb75a, #ff9f2a);
-  border-color: #ffb75a;
-  color: var(--accent-ink);
-  font-weight: 600;
+  background: var(--sel-bg);
+  border-color: var(--sel-bg);
+  color: var(--sel-fg);
+  font-weight: 650;
 }
 .btn.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #ffc477, #ffab45);
-  border-color: #ffc477;
+  background: var(--sel-hover);
+  border-color: var(--sel-hover);
 }
 .btn.blue {
-  background: linear-gradient(180deg, #4f8ef7, #3a77e0);
-  border-color: #5d9bff;
-  color: #fff;
-  font-weight: 600;
+  background: var(--surface);
+  border-color: var(--sel-bg);
+  color: var(--text);
+  font-weight: 650;
 }
 .btn.blue:hover:not(:disabled) {
-  background: linear-gradient(180deg, #62a0ff, #4584ec);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
 }
 .btn.ghost {
   background: transparent;
@@ -144,9 +152,9 @@ button {
   font-size: 14px;
 }
 .btn.active {
-  background: var(--accent-soft);
-  border-color: rgba(255, 170, 60, 0.55);
-  color: var(--accent-2);
+  background: var(--sel-bg);
+  border-color: var(--sel-bg);
+  color: var(--sel-fg);
 }
 .btn.wide {
   width: 100%;
@@ -157,9 +165,9 @@ button {
   display: inline-flex;
   padding: 3px;
   gap: 2px;
-  background: var(--bg-2);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 999px;
 }
 .seg button {
   display: inline-flex;
@@ -168,7 +176,7 @@ button {
   height: 26px;
   padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   background: transparent;
   color: var(--text-2);
   cursor: pointer;
@@ -176,12 +184,12 @@ button {
 }
 .seg button:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--fg-rgb), 0.04);
 }
 .seg button.on {
-  background: var(--raised-2);
-  color: var(--text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+  font-weight: 600;
 }
 .seg button:disabled {
   opacity: 0.4;
@@ -200,9 +208,9 @@ input[type="number"],
 input[type="text"],
 select {
   height: 28px;
-  border-radius: 6px;
+  border-radius: 999px;
   border: 1px solid var(--line-2);
-  background: var(--bg-2);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   padding: 0 8px;
@@ -211,7 +219,8 @@ select {
 input[type="number"]:focus,
 select:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px var(--blue-soft);
+  box-shadow: 0 0 0 3px rgba(var(--fg-rgb), 0.12);
+  border-color: var(--sel-bg);
 }
 input[type="number"] {
   width: 74px;
@@ -224,7 +233,7 @@ input[type="number"]::-webkit-inner-spin-button {
 select {
   padding-right: 26px;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23aeb5c4' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
   cursor: pointer;
@@ -244,7 +253,7 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent) var(--p), #353b49 var(--p));
+  background: linear-gradient(90deg, #fff var(--p), rgba(var(--fg-rgb), 0.18) var(--p));
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -252,9 +261,9 @@ input[type="range"]::-webkit-slider-thumb {
   height: 14px;
   margin-top: -5px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--sel-bg);
   border: 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(255, 170, 60, 0.25);
+  box-shadow: 0 0 0 4px rgba(var(--bg-rgb), 1), 0 0 0 5px rgba(var(--fg-rgb), 0.35);
 }
 input[type="range"]:disabled {
   opacity: 0.4;
@@ -267,7 +276,7 @@ input[type="range"]:disabled {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 5px;
-  background: var(--raised);
+  background: var(--surface);
   border: 1px solid var(--line-2);
   color: var(--text-2);
 }
@@ -277,4 +286,10 @@ input[type="range"]:disabled {
 }
 .small {
   font-size: 11.5px;
+}
+
+.mono,
+input[type="number"] {
+  font-family: var(--mono);
+  font-size: 12px;
 }

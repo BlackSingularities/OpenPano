@@ -89,9 +89,8 @@
     bottom: 54px;
     padding: 9px;
     border-radius: 14px;
-    background: rgba(22, 25, 32, 0.88);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface);
+    border: 1px solid var(--line-2);
     box-shadow: var(--shadow);
     cursor: default;
   }
@@ -105,14 +104,14 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(3, 38px);
+    grid-template-columns: repeat(3, 40px);
     gap: 5px;
   }
   .nb {
-    height: 36px;
-    border-radius: 9px;
+    height: 40px;
+    border-radius: 50%;
     border: 1px solid var(--line-2);
-    background: var(--raised);
+    background: var(--surface);
     color: var(--text);
     display: flex;
     align-items: center;
@@ -125,14 +124,14 @@
   }
   .nb.on,
   .nb:active {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border-color: var(--accent);
+    background: var(--sel-bg);
+    color: var(--sel-fg);
+    border-color: var(--sel-bg);
     transform: scale(0.96);
   }
   .nb.sec {
     color: var(--text-2);
-    background: var(--panel-2);
+    background: var(--surface);
   }
   .fitb {
     margin-top: 6px;
@@ -142,7 +141,7 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    border-radius: 8px;
+    border-radius: 999px;
     border: 1px solid var(--line);
     background: transparent;
     color: var(--text-2);

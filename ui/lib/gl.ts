@@ -20,6 +20,7 @@ uniform vec4 uSph;          // u0, v0, scale, wraps
 uniform vec2 uSphSize;
 uniform int uMode;          // 0 = display, 1 = coverage mask
 uniform float uChecker;     // checker cell size in device px
+uniform vec3 uBg;
 out vec4 outColor;
 
 const float PI = 3.14159265358979;
@@ -87,7 +88,7 @@ void main() {
   vec2 rel = (sp - uOrigin) / uK;           // plane units from top-left
   vec2 size = uBounds.zw - uBounds.xy;
   if (rel.x < 0.0 || rel.y < 0.0 || rel.x > size.x || rel.y > size.y) {
-    outColor = uMode == 1 ? vec4(0.0) : vec4(0.078, 0.086, 0.110, 1.0);
+    outColor = uMode == 1 ? vec4(0.0) : vec4(uBg, 1.0);
     return;
   }
   if (uFlip.x > 0.5) rel.x = size.x - rel.x;
@@ -113,8 +114,9 @@ void main() {
   }
   if (uMode == 1) { outColor = vec4(cov > 0.98 ? 1.0 : 0.0, 0.0, 0.0, 1.0); return; }
   vec2 cell = floor(sp / uChecker);
-  float chk = mod(cell.x + cell.y, 2.0) < 1.0 ? 0.155 : 0.2;
-  outColor = vec4(col + vec3(chk) * (1.0 - cov), 1.0);
+  float lb = dot(uBg, vec3(0.299, 0.587, 0.114));
+  vec3 chk = mod(cell.x + cell.y, 2.0) < 1.0 ? uBg + (lb > 0.5 ? -0.05 : 0.045) : uBg + (lb > 0.5 ? -0.1 : 0.085);
+  outColor = vec4(col + chk * (1.0 - cov), 1.0);
 }`;
 
 export interface SphereMeta {
@@ -136,6 +138,7 @@ export interface DrawParams {
   flipH: boolean;
   flipV: boolean;
   dpr: number;
+  bg?: [number, number, number];
 }
 
 export class SphereRenderer {
@@ -170,7 +173,7 @@ export class SphereRenderer {
     const a = gl.getAttribLocation(p, "aPos");
     gl.enableVertexAttribArray(a);
     gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
-    for (const n of ["uTex", "uViewport", "uOrigin", "uK", "uBounds", "uProj", "uR", "uFlip", "uSph", "uSphSize", "uMode", "uChecker"]) {
+    for (const n of ["uTex", "uViewport", "uOrigin", "uK", "uBounds", "uProj", "uR", "uFlip", "uSph", "uSphSize", "uMode", "uChecker", "uBg"]) {
       this.loc[n] = gl.getUniformLocation(p, n);
     }
   }
@@ -216,13 +219,16 @@ export class SphereRenderer {
     gl.uniform2f(this.loc.uSphSize, s.w, s.h);
     gl.uniform1i(this.loc.uMode, mode);
     gl.uniform1f(this.loc.uChecker, 10 * p.dpr);
+    const bg = p.bg ?? [0, 0, 0];
+    gl.uniform3f(this.loc.uBg, bg[0], bg[1], bg[2]);
   }
 
   draw(p: DrawParams) {
     const gl = this.gl;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     if (!this.sphere || !this.tex) {
-      gl.clearColor(0.078, 0.086, 0.11, 1);
+      const bg = p.bg ?? [0, 0, 0];
+      gl.clearColor(bg[0], bg[1], bg[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       return;
     }

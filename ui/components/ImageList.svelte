@@ -156,7 +156,7 @@
     font-size: 14px;
   }
   .title :global(svg) {
-    color: var(--accent);
+    color: var(--text);
   }
   .count {
     font-size: 11px;
@@ -216,7 +216,7 @@
     padding: 34px 16px;
     border: 1.5px dashed var(--line-2);
     border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.015);
+    background: rgba(var(--fg-rgb), 0.015);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -226,8 +226,8 @@
     color: var(--text-2);
   }
   .empty:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    border-color: var(--sel-bg);
+    background: var(--raised);
   }
   .eicon {
     color: var(--accent);
@@ -238,8 +238,8 @@
     gap: 10px;
     padding: 7px;
     border-radius: var(--radius);
-    background: var(--panel-2);
-    border: 1px solid transparent;
+    background: var(--surface);
+    border: 1px solid var(--line);
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
   }
@@ -247,9 +247,8 @@
     background: var(--raised);
   }
   .card.sel {
-    border-color: var(--accent);
-    background: #2a2a2a;
-    background: linear-gradient(0deg, var(--accent-soft), var(--accent-soft)), var(--panel-2);
+    border-color: var(--sel-bg);
+    background: var(--raised);
   }
   .card.off .thumb,
   .card.off .name {
@@ -281,8 +280,9 @@
     height: 18px;
     padding: 0 5px;
     border-radius: 9px;
-    background: rgba(10, 12, 16, 0.82);
-    color: var(--accent-2);
+    background: var(--surface);
+    border: 1px solid var(--line-2);
+    color: var(--text);
     font-size: 10.5px;
     font-weight: 700;
     display: flex;
@@ -350,8 +350,8 @@
     width: 18px;
     height: 18px;
     border-radius: 5px;
-    border: 1.5px solid var(--line-2);
-    background: var(--bg-2);
+    border: 1.5px solid rgba(var(--fg-rgb), 0.45);
+    background: var(--surface);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -360,14 +360,14 @@
     padding: 0;
   }
   .check.on {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--sel-bg);
+    border-color: var(--sel-bg);
   }
   .spin {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.12);
+    border: 2px solid rgba(var(--fg-rgb), 0.12);
     border-top-color: var(--accent);
     animation: spin 0.8s linear infinite;
   }
@@ -382,7 +382,7 @@
     min-width: 230px;
     padding: 5px;
     border-radius: 10px;
-    background: var(--panel-2);
+    background: var(--surface);
     border: 1px solid var(--line-2);
     box-shadow: var(--shadow);
   }

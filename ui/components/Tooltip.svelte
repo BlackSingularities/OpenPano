@@ -65,12 +65,12 @@
     max-width: 300px;
     padding: 8px 11px;
     border-radius: 9px;
-    background: #2b303c;
-    border: 1px solid #454d5f;
+    background: var(--surface);
+    border: 1px solid rgba(var(--fg-rgb), 0.35);
     color: var(--text);
     font-size: 12px;
     line-height: 1.45;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 28px rgba(var(--bg-rgb), 0.5);
     pointer-events: none;
     opacity: 0;
     transform: translateY(-3px);

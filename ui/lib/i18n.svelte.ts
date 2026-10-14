@@ -246,6 +246,15 @@ const D = {
   h_align: ["Wyszukuje wspólne punkty, oblicza położenie każdego zdjęcia i przygotowuje podgląd (Ctrl+Enter).", "Finds common points, computes each image's position and prepares the preview (Ctrl+Enter)."],
   h_render: ["Renderuje panoramę w pełnej rozdzielczości i zapisuje plik (Ctrl+S).", "Renders the panorama at full resolution and saves the file (Ctrl+S)."],
   h_outSize: ["Szacowany rozmiar pliku wynikowego po kadrowaniu oraz potrzebna pamięć RAM.", "Estimated output size after cropping and the RAM needed."],
+  theme: ["Motyw", "Theme"],
+  theme_dark: ["Ciemny (AMOLED)", "Dark (AMOLED)"],
+  theme_light: ["Jasny", "Light"],
+  theme_gray: ["Szary", "Gray"],
+  theme_classic: ["Klasyczny (grafit i pomarańcz)", "Classic (graphite & orange)"],
+  theme_custom: ["Własny kolor", "Custom colour"],
+  themePick: ["Wybierz dowolny kolor interfejsu – tekst i ikony dopasują się automatycznie (czarne lub białe).", "Pick any interface colour – text and icons adapt automatically (black or white)."],
+  tabPreview: ["Podgląd", "Preview"],
+  tabSettings: ["Ustawienia", "Settings"],
   stageLoading: ["Wczytywanie zdjęć", "Loading images"],
 } as const;
 

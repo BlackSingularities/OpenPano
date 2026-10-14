@@ -247,8 +247,8 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px 14px;
     padding: 10px 12px;
-    border-radius: 8px;
-    background: var(--bg-2);
+    border-radius: 14px;
+    background: var(--surface);
     border: 1px solid var(--line);
   }
   .out {
@@ -282,7 +282,7 @@
     color: var(--text-3);
   }
   .good {
-    color: var(--ok);
+    color: var(--text);
   }
   .mid {
     color: var(--warn);
@@ -301,9 +301,9 @@
     align-items: flex-start;
     gap: 1px;
     padding: 7px 9px;
-    border-radius: 8px;
+    border-radius: 12px;
     border: 1px solid var(--line);
-    background: var(--bg-2);
+    background: var(--surface);
     cursor: pointer;
     text-align: left;
     min-width: 0;
@@ -313,8 +313,13 @@
     background: var(--raised);
   }
   .pc.on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    border-color: var(--sel-bg);
+    background: var(--sel-bg);
+    color: var(--sel-fg);
+  }
+  .pc.on .pd {
+    color: var(--sel-fg);
+    opacity: 0.65;
   }
   .pc.auto {
     grid-column: 1 / -1;

@@ -46,7 +46,8 @@
     width: 34px;
     height: 19px;
     border-radius: 20px;
-    background: #3a4050;
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px rgba(var(--fg-rgb), 0.35);
     position: relative;
     transition: background 0.15s;
     flex: none;
@@ -58,12 +59,16 @@
     width: 15px;
     height: 15px;
     border-radius: 50%;
-    background: #fff;
-    transition: transform 0.15s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    background: rgba(var(--fg-rgb), 0.75);
+    transition: transform 0.15s, background 0.15s;
+    box-shadow: 0 1px 3px rgba(var(--bg-rgb), 0.4);
   }
   .on .track {
-    background: var(--accent);
+    background: var(--sel-bg);
+    box-shadow: none;
+  }
+  .on .knob {
+    background: var(--surface);
   }
   .on .knob {
     transform: translateX(15px);

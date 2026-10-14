@@ -9,16 +9,25 @@
   import Viewer from "./components/Viewer.svelte";
   import Tooltip from "./components/Tooltip.svelte";
   import { t, getLang } from "./lib/i18n.svelte";
+  import { THEMES, type ThemeId } from "./lib/theme";
   import {
     S, app, vw, init, setLanguage, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
-    hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere,
+    hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere, IS_MOBILE, setTheme,
   } from "./lib/store.svelte";
 
   const AUTHOR = "https://redzikowski.com";
   const REPO = "https://github.com/BlackSingularities/Panoramer";
-  const VERSION = "2.0.0";
+  const VERSION = "2.1.0";
 
   let menuOpen = $state(false);
+  let winW = $state(window.innerWidth);
+  const compact = $derived(IS_MOBILE || winW < 900);
+  let tab = $state<"images" | "view" | "settings">("images");
+  let lastAlign: unknown = null;
+  $effect(() => {
+    if (app.align && app.align !== lastAlign) tab = "view";
+    lastAlign = app.align;
+  });
   let now = $state(Date.now());
   let allowClose = false;
 
@@ -142,12 +151,12 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} onclick={() => (menuOpen = false)} />
+<svelte:window onkeydown={onKey} onclick={() => (menuOpen = false)} onresize={() => (winW = window.innerWidth)} />
 
 <Tooltip />
 
 {#if app.ready}
-  <div class="shell">
+  <div class="shell" class:compact>
     <header>
       <div class="brand">
         <img src="/icon.png" alt="" />
@@ -157,7 +166,7 @@
         </div>
       </div>
 
-      <nav class="steps">
+      {#if !compact}<nav class="steps">
         {#each [t("stepImages"), t("stepAlign"), t("stepExport")] as label, i}
           <div class="step" class:done={step > i + 1} class:cur={step === i + 1}>
             <span class="dot">{#if step > i + 1}<Icon name="check" size={12} stroke={3} />{:else}{i + 1}{/if}</span>
@@ -165,13 +174,13 @@
           </div>
           {#if i < 2}<span class="line" class:done={step > i + 1}></span>{/if}
         {/each}
-      </nav>
+      </nav>{:else}<span class="grow"></span>{/if}
 
       <div class="actions">
-        <button class="btn" onclick={pickFiles} data-tip="Ctrl+O"><Icon name="plus" size={16} />{t("addImages")}</button>
-        <button class="btn blue" disabled={busyBlocking() || readyIds().length < 2} onclick={align} data-tip="Ctrl+Enter"><Icon name="align" size={16} />{t("align")}</button>
-        <button class="btn primary" disabled={!app.align || busyBlocking()} onclick={renderAndSave} data-tip="Ctrl+S"><Icon name="download" size={16} />{t("export")}</button>
-        <div class="sep"></div>
+        {#if !compact}<button class="btn" onclick={pickFiles} data-tip="Ctrl+O"><Icon name="plus" size={16} />{t("addImages")}</button>{/if}
+        <button class="btn blue" class:icon={compact} disabled={busyBlocking() || readyIds().length < 2} onclick={align} data-tip="Ctrl+Enter"><Icon name="align" size={16} />{#if !compact}{t("align")}{/if}</button>
+        <button class="btn primary" class:icon={compact} disabled={!app.align || busyBlocking()} onclick={renderAndSave} data-tip="Ctrl+S"><Icon name="download" size={16} />{#if !compact}{t("export")}{/if}</button>
+        {#if !compact}<div class="sep"></div>{/if}
         <div class="seg lang">
           <button class:on={getLang() === "pl"} onclick={() => setLanguage("pl")}>PL</button>
           <button class:on={getLang() === "en"} onclick={() => setLanguage("en")}>EN</button>
@@ -198,6 +207,26 @@
                 <button class:on={S.settings.ui.quality === "high"} onclick={() => setQuality("high")}>{t("qHigh")}</button>
               </div>
               <div class="dsep"></div>
+              <div class="dlabel">{t("theme")}</div>
+              <div class="themes">
+                {#each THEMES.filter((x) => !IS_MOBILE || !x.desktopOnly) as th}
+                  <button
+                    class="swatch"
+                    class:on={S.settings.ui.theme === th.id}
+                    data-tip={t(("theme_" + th.id) as any)}
+                    style="background:{th.id === 'custom' ? S.settings.ui.customColor : th.swatch}"
+                    onclick={() => setTheme(th.id as ThemeId)}
+                  >{#if th.id === "custom"}<span class="rgb"></span>{/if}</button>
+                {/each}
+                {#if !IS_MOBILE}
+                  <label class="picker" data-tip={t("themePick")}>
+                    <input type="color" value={S.settings.ui.customColor} oninput={(e) => setTheme("custom", (e.target as HTMLInputElement).value)} />
+                    RGB
+                  </label>
+                {/if}
+              </div>
+              <div class="tname">{t(("theme_" + S.settings.ui.theme) as any)}</div>
+              <div class="dsep"></div>
               <button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>
               <button onclick={() => ((menuOpen = false), (app.dialogs.log = true))}><Icon name="list" size={15} />{t("log")}</button>
               <button onclick={() => ((menuOpen = false), openUrl(REPO))}><Icon name="github" size={15} />{t("projectPage")}</button>
@@ -208,7 +237,46 @@
       </div>
     </header>
 
-    <main>
+    {#if compact}
+      <main class="m">
+        {#if tab === "images"}
+          <ImageList />
+        {:else if tab === "settings"}
+          <Inspector />
+        {:else}
+          <div class="center">
+        {#if app.align}
+          <Viewer />
+        {:else}
+          <div class="welcome">
+            <div class="wcard">
+              <img src="/icon.png" alt="" class="wlogo" />
+              <h1>{t("welcomeTitle")}</h1>
+              <p>{app.images.length ? t("welcomeAlign") : t("welcomeText")}</p>
+              <div class="wbtns">
+                {#if !app.images.length}
+                  <button class="btn primary lg" onclick={pickFiles}><Icon name="plus" size={18} />{t("addImages")}</button>
+                  <button class="btn lg" onclick={pickFolder}><Icon name="folder" size={18} />{t("addFolder")}</button>
+                {:else}
+                  <button class="btn blue lg" disabled={busyBlocking() || readyIds().length < 2} onclick={align}><Icon name="align" size={18} />{t("alignImages")}</button>
+                  <button class="btn lg" onclick={pickFiles}><Icon name="plus" size={18} />{t("addImages")}</button>
+                {/if}
+              </div>
+              {#if app.job?.kind === "align"}
+                <div class="wprog">
+                  <div class="bar"><div class="fill" style="width:{app.job.fraction * 100}%"></div></div>
+                  <span>{app.job.stage}</span>
+                </div>
+              {/if}
+              <div class="wformats">{t("formats")}</div>
+            </div>
+          </div>
+        {/if}
+      </div>
+        {/if}
+      </main>
+    {:else}
+      <main>
       <div class="left"><ImageList /></div>
       <div class="center">
         {#if app.align}
@@ -241,6 +309,7 @@
       </div>
       <div class="right"><Inspector /></div>
     </main>
+    {/if}
 
     <footer>
       {#if app.job && app.job.kind !== "sphere"}
@@ -258,8 +327,17 @@
       <span class="grow"></span>
       {#if unsaved && app.align}<span class="unsaved"><span class="udot"></span>{t("notExported")}</span>{/if}
       <span class="muted">Panoramer {VERSION}</span>
-      <button class="link" onclick={() => openUrl(AUTHOR)}>redzikowski.com</button>
+      {#if !compact}<button class="link" onclick={() => openUrl(AUTHOR)}>redzikowski.com</button>{/if}
     </footer>
+    {#if compact}
+      <nav class="tabs">
+        <button class:on={tab === "images"} onclick={() => (tab = "images")}>
+          <span class="ti"><Icon name="image" size={20} /></span>{t("images")}{#if app.images.length}<b>{app.images.length}</b>{/if}
+        </button>
+        <button class:on={tab === "view"} onclick={() => (tab = "view")}><span class="ti"><Icon name="sphere" size={20} /></span>{t("tabPreview")}</button>
+        <button class:on={tab === "settings"} onclick={() => (tab = "settings")}><span class="ti"><Icon name="sliders" size={20} /></span>{t("tabSettings")}</button>
+      </nav>
+    {/if}
   </div>
 
   {#if app.dragOver}
@@ -357,13 +435,101 @@
     display: grid;
     grid-template-rows: 56px 1fr 30px;
     height: 100%;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  .shell.compact {
+    grid-template-rows: 54px 1fr auto auto;
+  }
+  .shell.compact header {
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .shell.compact .brand {
+    min-width: 0;
+  }
+  .shell.compact .btag {
+    display: none;
+  }
+  .shell.compact footer {
+    min-height: 0;
+    padding: 6px 12px;
+    flex-wrap: wrap;
+  }
+  .shell.compact footer:not(:has(.pbar)) {
+    display: none;
+  }
+  .m {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .m > :global(*) {
+    flex: 1;
+    min-height: 0;
+  }
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 6px 10px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .tabs button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: var(--text-3);
+    font-size: 11px;
+    cursor: pointer;
+    position: relative;
+  }
+  .tabs .ti {
+    width: 54px;
+    height: 30px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tabs button.on {
+    color: var(--text);
+  }
+  .tabs button.on .ti {
+    background: var(--sel-bg);
+    color: var(--sel-fg);
+  }
+  .tabs b {
+    position: absolute;
+    top: 0;
+    left: calc(50% + 12px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    border: 1px solid var(--surface);
+    background: var(--sel-bg);
+    color: var(--sel-fg);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .grow {
+    flex: 1;
   }
   header {
     display: flex;
     align-items: center;
     gap: 18px;
     padding: 0 12px 0 14px;
-    background: linear-gradient(180deg, #1d212a, #181b22);
+    background: var(--surface);
     border-bottom: 1px solid var(--line);
   }
   .brand {
@@ -420,15 +586,15 @@
     background: var(--accent);
     border-color: var(--accent);
     color: var(--accent-ink);
-    box-shadow: 0 0 0 4px var(--accent-soft);
+    box-shadow: 0 0 0 4px rgba(var(--fg-rgb), 0.12);
   }
   .step.done {
     color: var(--text-2);
   }
   .step.done .dot {
-    background: rgba(95, 208, 138, 0.18);
-    border-color: rgba(95, 208, 138, 0.5);
-    color: var(--ok);
+    background: var(--surface);
+    border-color: var(--sel-bg);
+    color: var(--text);
   }
   .line {
     width: 34px;
@@ -437,7 +603,7 @@
     background: var(--line-2);
   }
   .line.done {
-    background: rgba(95, 208, 138, 0.6);
+    background: rgba(var(--fg-rgb), 0.6);
   }
   @media (max-width: 1350px) {
     .steps {
@@ -474,7 +640,7 @@
     width: 250px;
     padding: 6px;
     border-radius: 12px;
-    background: var(--panel-2);
+    background: var(--surface);
     border: 1px solid var(--line-2);
     box-shadow: var(--shadow);
   }
@@ -508,6 +674,65 @@
   .q {
     margin: 0 4px 4px;
   }
+  .themes {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 2px 9px 4px;
+  }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--line-2);
+    cursor: pointer;
+    position: relative;
+    padding: 0;
+  }
+  .swatch.on {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+  .rgb {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: conic-gradient(#f44, #fd4, #4f8, #4af, #a4f, #f44);
+    border: 1px solid var(--surface);
+  }
+  .picker {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .picker input {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--line-2);
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+  }
+  .picker input::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  .picker input::-webkit-color-swatch {
+    border: 0;
+    border-radius: 50%;
+  }
+  .tname {
+    padding: 0 9px 4px;
+    font-size: 11.5px;
+    color: var(--text-3);
+  }
   main {
     display: grid;
     grid-template-columns: 300px 1fr 360px;
@@ -533,7 +758,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(ellipse at 50% 40%, #1c2029 0%, #111318 70%);
+    background: var(--surface);
   }
   .wcard {
     width: min(540px, 90%);
@@ -546,7 +771,7 @@
   .wlogo {
     width: 84px;
     height: 84px;
-    filter: drop-shadow(0 10px 30px rgba(255, 170, 60, 0.18));
+    
   }
   .wcard h1 {
     margin: 4px 0 0;
@@ -581,7 +806,7 @@
   }
   .fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--blue), var(--accent));
+    background: var(--sel-bg);
     transition: width 0.2s;
   }
   .wformats {
@@ -611,7 +836,7 @@
   }
   .pfill {
     height: 100%;
-    background: linear-gradient(90deg, var(--blue), var(--accent));
+    background: var(--sel-bg);
     transition: width 0.15s;
   }
   .pct {
@@ -628,7 +853,7 @@
     width: 13px;
     height: 13px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(var(--fg-rgb), 0.15);
     border-top-color: var(--accent);
     animation: spin 0.8s linear infinite;
   }
@@ -662,7 +887,7 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--err);
   }
   .link {
     border: 0;
@@ -683,7 +908,7 @@
     position: fixed;
     inset: 0;
     z-index: 80;
-    background: rgba(8, 9, 12, 0.72);
+    background: rgba(var(--bg-rgb), 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -696,8 +921,8 @@
     gap: 14px;
     padding: 50px 80px;
     border-radius: 18px;
-    border: 2px dashed var(--accent);
-    background: var(--accent-soft);
+    border: 1.5px dashed var(--text);
+    background: rgba(var(--bg-rgb), 0.85);
     color: var(--accent-2);
     font-size: 18px;
     font-weight: 600;
@@ -719,7 +944,7 @@
     gap: 10px;
     padding: 9px 10px 9px 13px;
     border-radius: 12px;
-    background: rgba(32, 36, 46, 0.97);
+    background: var(--surface);
     border: 1px solid var(--line-2);
     box-shadow: var(--shadow);
     max-width: 720px;
@@ -758,23 +983,23 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(5, 6, 9, 0.6);
+    background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(3px);
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .modal-bg.strong {
-    background: rgba(5, 6, 9, 0.75);
+    background: rgba(0, 0, 0, 0.7);
   }
   .modal {
     width: 480px;
     max-width: 92vw;
     padding: 20px 22px;
     border-radius: 16px;
-    background: var(--panel-2);
+    background: var(--surface);
     border: 1px solid var(--line-2);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 30px 80px rgba(var(--bg-rgb), 0.9);
     animation: pop 0.16s ease-out;
   }
   .modal.wide {
@@ -849,7 +1074,7 @@
     padding: 10px 18px;
     border-radius: 12px;
     background: var(--accent-soft);
-    border: 1px solid rgba(255, 170, 60, 0.35);
+    border: 1px solid var(--line-2);
   }
   .credit span {
     font-size: 11px;

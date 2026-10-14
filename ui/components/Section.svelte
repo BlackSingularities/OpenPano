@@ -18,7 +18,7 @@
 
 <style>
   section {
-    background: var(--panel-2);
+    background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     margin-bottom: 10px;
@@ -36,10 +36,10 @@
     text-align: left;
   }
   .head:hover {
-    background: rgba(255, 255, 255, 0.025);
+    background: rgba(var(--fg-rgb), 0.025);
   }
   .ic {
-    color: var(--accent);
+    color: var(--text);
     display: flex;
   }
   .title {
@@ -51,8 +51,8 @@
   .badge {
     font-size: 11px;
     color: var(--text-2);
-    background: var(--raised);
-    padding: 2px 8px;
+    border: 1px solid var(--line-2);
+    padding: 1px 8px;
     border-radius: 20px;
   }
   .chev {
