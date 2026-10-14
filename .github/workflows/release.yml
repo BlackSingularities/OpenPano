@@ -57,10 +57,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
       - name: Install NDK
         run: |
-          sdkmanager --install "ndk;27.2.12479018" > /dev/null
+          SDKM=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager
+          yes | $SDKM --licenses > /dev/null || true
+          $SDKM --install "ndk;27.2.12479018" "platforms;android-34" "build-tools;34.0.0" > /dev/null
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -110,15 +111,23 @@ jobs:
           V=$(node -p "require('./src-tauri/tauri.conf.json').version")
           npm run build
           npx tauri ios init --ci
+          # Build the Rust library ourselves (the Xcode phase expects a running tauri CLI).
+          cargo build --release --lib -p panoramer --target aarch64-apple-ios --features tauri/custom-protocol
+          mkdir -p src-tauri/gen/apple/Externals/arm64/release
+          cp target/aarch64-apple-ios/release/libpanoramer_lib.a src-tauri/gen/apple/Externals/arm64/release/libapp.a
           PROJ=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
+          # neutralise the "Build Rust Code" phase
+          perl -0pi -e 's/shellScript = "[^"]*xcode-script[^"]*";/shellScript = "true";/g' "$PROJ/project.pbxproj"
           SCHEME=$(xcodebuild -list -project "$PROJ" | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')
           echo "project: $PROJ scheme: $SCHEME"
-          xcodebuild -project "$PROJ" -scheme "$SCHEME" -configuration release -sdk iphoneos -destination 'generic/platform=iOS' \
-            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -40
+          set -o pipefail
+          xcodebuild -project "$PROJ" -scheme "$SCHEME" -configuration release -sdk iphoneos -destination 'generic/platform=iOS'             -derivedDataPath build ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -25
           APP=$(find build/Build/Products -name "*.app" -maxdepth 2 | head -1)
-          echo "app: $APP"
+          echo "app: $APP"; ls -la "$APP" | head
+          test -f "$APP/$(defaults read "$PWD/$APP/Info.plist" CFBundleExecutable)"
           mkdir -p Payload out && cp -R "$APP" Payload/
           zip -qr "out/Panoramer-$V-ios-unsigned.ipa" Payload
+          ls -la out
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.release.outputs.version) }}
