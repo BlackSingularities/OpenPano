@@ -1,0 +1,17 @@
+[package]
+name = "panoramer-core"
+version.workspace = true
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "tiff", "webp", "bmp"] }
+rayon = "1.10"
+nalgebra = "0.33"
+rawloader = "0.37"
+kamadak-exif = "0.5"
+serde = { version = "1", features = ["derive"] }
+half = "2"
+flate2 = "1"
+anyhow = "1"
+sys-locale = "0.3"

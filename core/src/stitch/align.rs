@@ -18,6 +18,7 @@ pub enum MatchStrategy {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AlignSettings {
     pub lens: LensType,
     /// Manual horizontal field of view in degrees (overrides EXIF / estimation).

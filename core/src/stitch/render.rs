@@ -25,7 +25,10 @@ pub enum CropMode {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RenderSettings {
+    /// Choose the projection automatically from the panorama's coverage.
+    pub auto_projection: bool,
     pub projection: Projection,
     pub blend: BlendMode,
     /// Number of multi-band levels; 0 = automatic.
@@ -45,11 +48,15 @@ pub struct RenderSettings {
     /// Field of view override for zoomable projections (degrees, 0 = auto).
     pub circular_fisheye: bool,
     pub bicubic: bool,
+    /// Mirror the result horizontally / vertically.
+    pub flip_h: bool,
+    pub flip_v: bool,
 }
 
 impl Default for RenderSettings {
     fn default() -> Self {
         Self {
+            auto_projection: true,
             projection: Projection::Cylindrical,
             blend: BlendMode::Multiband,
             bands: 0,
@@ -63,6 +70,8 @@ impl Default for RenderSettings {
             roll: 0.0,
             circular_fisheye: false,
             bicubic: true,
+            flip_h: false,
+            flip_v: false,
         }
     }
 }
@@ -90,8 +99,74 @@ impl Canvas {
         self.proj.inverse(u, v).map(|d| self.view.inverse() * d)
     }
 
-    pub fn megapixels(&self) -> f64 {
-        (self.w * self.h) as f64 / 1e6
+    /// World direction -> canvas pixel coordinates (unclamped).
+    #[inline]
+    pub fn world_pixel(&self, d: &V3) -> Option<(f64, f64)> {
+        let (u, v) = self.proj.forward(&(self.view * d))?;
+        Some(((u - self.u0) * self.scale - 0.5, (v - self.v0) * self.scale - 0.5))
+    }
+
+    /// Horizontal and vertical extent of the canvas in plane units.
+    pub fn extent(&self) -> (f64, f64) {
+        (self.w as f64 / self.scale, self.h as f64 / self.scale)
+    }
+}
+
+/// Angular coverage of the aligned images in degrees: (longitude span, latitude min, latitude max).
+pub fn coverage(al: &Alignment) -> (f64, f64, f64) {
+    let mut lons: Vec<f64> = Vec::new();
+    let (mut lat0, mut lat1) = (f64::MAX, f64::MIN);
+    for cam in al.cameras.iter().flatten() {
+        for (x, y) in boundary_samples(cam.w, cam.h, 16, 4) {
+            let d = cam.ray_world(al.lens, x, y);
+            let lon = d.x.atan2(d.z).to_degrees();
+            let lat = (-d.y).atan2((d.x * d.x + d.z * d.z).sqrt()).to_degrees();
+            lons.push(lon);
+            lat0 = lat0.min(lat);
+            lat1 = lat1.max(lat);
+        }
+    }
+    if lons.is_empty() {
+        return (0.0, 0.0, 0.0);
+    }
+    lons.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mut gap: f64 = 360.0 - (lons[lons.len() - 1] - lons[0]);
+    for k in 1..lons.len() {
+        gap = gap.max(lons[k] - lons[k - 1]);
+    }
+    // a pole inside the coverage means full longitude coverage
+    if lat1 > 89.0 || lat0 < -89.0 {
+        gap = 0.0;
+    }
+    ((360.0 - gap).clamp(0.0, 360.0), lat0, lat1)
+}
+
+/// Pick a projection suited to the panorama's coverage.
+pub fn auto_projection(al: &Alignment) -> Projection {
+    let (lon, lat0, lat1) = coverage(al);
+    let lat = lat1 - lat0;
+    if lon >= 300.0 {
+        if lat >= 100.0 || lat1 > 70.0 || lat0 < -70.0 {
+            Projection::Equirectangular
+        } else {
+            Projection::Cylindrical
+        }
+    } else if lat > lon * 1.3 && lat > 90.0 {
+        Projection::TransverseMercator
+    } else if lon <= 110.0 && lat <= 100.0 {
+        Projection::Rectilinear
+    } else if lat <= 110.0 {
+        Projection::Cylindrical
+    } else {
+        Projection::Equirectangular
+    }
+}
+
+pub fn effective_projection(al: &Alignment, st: &RenderSettings) -> Projection {
+    if st.auto_projection {
+        auto_projection(al)
+    } else {
+        st.projection
     }
 }
 
@@ -109,7 +184,7 @@ pub fn native_scale(al: &Alignment) -> f64 {
 /// limited by max_megapixels.
 pub fn layout(al: &Alignment, st: &RenderSettings, px_scale: Option<f64>) -> Result<Canvas, StitchError> {
     let view = ypr_rotation(st.yaw, st.pitch, st.roll).inverse();
-    let proj = st.projection;
+    let proj = effective_projection(al, st);
     let (lu0, lu1, lv0, lv1) = proj.limits();
     let wrap = proj.wraps();
     let mut u0 = f64::MAX;
@@ -153,13 +228,21 @@ pub fn layout(al: &Alignment, st: &RenderSettings, px_scale: Option<f64>) -> Res
             // The image straddles the ±180° seam (or contains a pole): it spans the full width.
             bu0 = lu0;
             bu1 = lu1;
-            // Check whether the forward camera axis is near a pole; extend vertical bounds then.
-            let z = view * (cam.rot * V3::new(0.0, 0.0, 1.0));
-            if let Some((_, vz)) = proj.forward(&z) {
-                if vz < 0.0 {
-                    bv0 = lv0.max(bv0.min(lv0));
-                } else {
-                    bv1 = lv1.min(bv1.max(lv1));
+            // Extend vertically only when the image really contains a pole of the view.
+            let inv_view = view.inverse();
+            let cam_inv = cam.rot.inverse();
+            let hw = cam.w as f64 / 2.0;
+            let hh = cam.h as f64 / 2.0;
+            for (pole, top) in [(V3::new(0.0, -1.0, 0.0), true), (V3::new(0.0, 1.0, 0.0), false)] {
+                let c = cam_inv * (inv_view * pole);
+                if let Some((x, y)) = al.lens.project(&c, cam.f) {
+                    if x.abs() < hw && y.abs() < hh {
+                        if top {
+                            bv0 = lv0;
+                        } else {
+                            bv1 = lv1;
+                        }
+                    }
                 }
             }
         }
@@ -209,7 +292,7 @@ pub fn layout(al: &Alignment, st: &RenderSettings, px_scale: Option<f64>) -> Res
     Ok(Canvas { proj, view, u0, v0, scale, w, h, boxes })
 }
 
-fn boundary_samples(w: usize, h: usize, edge: usize, grid: usize) -> Vec<(f64, f64)> {
+pub fn boundary_samples(w: usize, h: usize, edge: usize, grid: usize) -> Vec<(f64, f64)> {
     let mut v = Vec::new();
     let (wf, hf) = ((w - 1) as f64, (h - 1) as f64);
     for k in 0..=edge {
@@ -424,6 +507,12 @@ pub fn render(
             *p = [0.0; 3];
         }
     }
+    // ---------- mirror ----------
+    let mut alpha = alpha;
+    if st.flip_h || st.flip_v {
+        flip_in_place(&mut image.data, cw, ch, st.flip_h, st.flip_v);
+        flip_in_place(&mut alpha, cw, ch, st.flip_h, st.flip_v);
+    }
     // ---------- crop ----------
     let full = (0, 0, cw, ch);
     let crop = match st.crop {
@@ -456,6 +545,20 @@ pub fn render(
     };
     progress.set_fraction(1.0);
     Ok(RenderOutput { image, alpha, canvas, crop })
+}
+
+pub fn flip_in_place<T: Copy>(v: &mut [T], w: usize, h: usize, fh: bool, fv: bool) {
+    if fh {
+        for row in v.chunks_mut(w) {
+            row.reverse();
+        }
+    }
+    if fv {
+        for y in 0..h / 2 {
+            let (a, b) = v.split_at_mut((h - 1 - y) * w);
+            a[y * w..(y + 1) * w].swap_with_slice(&mut b[..w]);
+        }
+    }
 }
 
 /// Largest axis-aligned rectangle fully covered (computed on a reduced mask).

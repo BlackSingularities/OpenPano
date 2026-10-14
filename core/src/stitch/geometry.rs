@@ -362,12 +362,74 @@ fn inv_stereo(u: f64, v: f64) -> V3 {
     V3::new(u / d, v / d, (1.0 - r2) / d)
 }
 
-/// Rotation from yaw (around y), pitch (around x) and roll (around z), degrees.
+/// Rotation from yaw (around y), pitch (around x, positive = looking up) and roll (around z),
+/// in degrees. Maps view-space directions to world directions.
 pub fn ypr_rotation(yaw: f64, pitch: f64, roll: f64) -> Rot {
     let ry = Rot::from_axis_angle(&V3::y_axis(), yaw.to_radians());
-    let rx = Rot::from_axis_angle(&V3::x_axis(), -pitch.to_radians());
+    let rx = Rot::from_axis_angle(&V3::x_axis(), pitch.to_radians());
     let rz = Rot::from_axis_angle(&V3::z_axis(), roll.to_radians());
     ry * rx * rz
+}
+
+/// Inverse of [`ypr_rotation`]: returns (yaw, pitch, roll) in degrees.
+pub fn ypr_from_rotation(m: &Rot) -> (f64, f64, f64) {
+    let c = m * V3::new(0.0, 0.0, 1.0);
+    let pitch = (-c.y).clamp(-1.0, 1.0).asin();
+    let yaw = c.x.atan2(c.z);
+    let r0 = Rot::from_axis_angle(&V3::y_axis(), yaw) * Rot::from_axis_angle(&V3::x_axis(), pitch);
+    let rz = r0.inverse() * m;
+    let mz = rz.matrix();
+    let roll = mz[(1, 0)].atan2(mz[(0, 0)]);
+    (yaw.to_degrees(), pitch.to_degrees(), roll.to_degrees())
+}
+
+/// (yaw, pitch) in degrees that put world direction `d` at the centre of the view.
+pub fn yaw_pitch_towards(d: &V3) -> (f64, f64) {
+    let d = d.normalize();
+    (d.x.atan2(d.z).to_degrees(), (-d.y).clamp(-1.0, 1.0).asin().to_degrees())
+}
+
+/// Find yaw/pitch (keeping roll) such that world direction `d` is seen along view direction `q`.
+/// Used for "grab and drag" interaction. Starts from the given yaw/pitch.
+pub fn solve_grab(d: &V3, q: &V3, yaw: f64, pitch: f64, roll: f64) -> (f64, f64) {
+    let (mut y, mut p) = (yaw, pitch);
+    let f = |y: f64, p: f64| -> V3 { ypr_rotation(y, p, roll) * q - d };
+    for _ in 0..12 {
+        let r = f(y, p);
+        if r.norm() < 1e-10 {
+            break;
+        }
+        let h = 1e-4;
+        let jy = (f(y + h, p) - r) / h;
+        let jp = (f(y, p + h) - r) / h;
+        // 2x2 normal equations
+        let a = jy.dot(&jy);
+        let b = jy.dot(&jp);
+        let c = jp.dot(&jp);
+        let gy = jy.dot(&r);
+        let gp = jp.dot(&r);
+        let det = a * c - b * b;
+        if det.abs() < 1e-18 {
+            break;
+        }
+        let dy = (c * gy - b * gp) / det;
+        let dp = (a * gp - b * gy) / det;
+        y -= dy.clamp(-30.0, 30.0);
+        p = (p - dp.clamp(-30.0, 30.0)).clamp(-90.0, 90.0);
+    }
+    let mut y = y % 360.0;
+    if y > 180.0 {
+        y -= 360.0;
+    }
+    if y < -180.0 {
+        y += 360.0;
+    }
+    (y, p)
+}
+
+/// Smallest rotation taking unit vector `a` onto unit vector `b`.
+pub fn rotation_between(a: &V3, b: &V3) -> Rot {
+    Rot::rotation_between(a, b).unwrap_or_else(|| Rot::from_axis_angle(&V3::x_axis(), std::f64::consts::PI))
 }
 
 #[cfg(test)]
@@ -389,6 +451,24 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn ypr_roundtrip() {
+        for (y, p, r) in [(10.0, 20.0, 30.0), (-120.0, -45.0, 5.0), (170.0, 80.0, -90.0)] {
+            let m = ypr_rotation(y, p, r);
+            let (a, b, c) = ypr_from_rotation(&m);
+            assert!((a - y).abs() < 1e-6 && (b - p).abs() < 1e-6 && (c - r).abs() < 1e-6, "{a} {b} {c}");
+        }
+    }
+
+    #[test]
+    fn grab_solves() {
+        let d = V3::new(0.3, -0.2, 0.9).normalize();
+        let q = V3::new(-0.1, 0.1, 1.0).normalize();
+        let (y, p) = solve_grab(&d, &q, 0.0, 0.0, 0.0);
+        let back = ypr_rotation(y, p, 0.0) * q;
+        assert!((back - d).norm() < 1e-6);
     }
 
     #[test]

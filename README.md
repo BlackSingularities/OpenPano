@@ -4,6 +4,7 @@
 
 <p align="center">
 Profesjonalne narzędzie do łączenia zdjęć w panoramy · Professional panorama stitcher<br>
+Pomysł i wykonanie / Idea and development: <a href="https://redzikowski.com"><b>redzikowski.com</b></a><br>
 <a href="https://github.com/BlackSingularities/Panoramer/releases/latest"><b>⬇ Pobierz / Download</b></a>
 </p>
 
@@ -11,7 +12,7 @@ Profesjonalne narzędzie do łączenia zdjęć w panoramy · Professional panora
 
 ## 🇵🇱 Po polsku
 
-Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne, prostoliniowe, Panini, „małą planetę” i inne. To natywna aplikacja Windows napisana w Rust. Nie wymaga instalowania dodatkowych bibliotek i ma interfejs po polsku i angielsku.
+Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne, prostoliniowe, Panini, „małą planetę” i inne. Silnik jest napisany w Ruście, a nowoczesny interfejs w Tauri 2 + Svelte. Podgląd renderuje karta graficzna (WebGL), więc obracanie i zmiana projekcji działają płynnie w czasie rzeczywistym. Interfejs jest po polsku i angielsku, z podpowiedziami przy każdej opcji.
 
 ### Możliwości
 - **Pliki wejściowe:** JPEG, TIFF, PNG, WebP, BMP oraz **RAW**: ARW, NEF, CR2, DNG, RAF, ORF, RW2, PEF, SRW, 3FR, IIQ i inne (obsługiwane przez rawloader; CR3 nie jest obsługiwany).
@@ -23,7 +24,15 @@ Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne
   - RANSAC,
   - drzewo rozpinające i bundle adjustment (Levenberg–Marquardt) obrotów i ogniskowej,
   - ogniskowa odczytywana z EXIF albo szacowana automatycznie.
-- **Prostowanie horyzontu** oraz ręczna korekta yaw/pitch/roll, także przez przeciąganie podglądu.
+- **Interaktywny widok:**
+  - przeciąganie panoramy (chwycony punkt podąża za kursorem),
+  - panel nawigacji na ekranie (przytrzymaj, aby płynnie obracać),
+  - narzędzia: ustaw środek, wypoziomuj horyzont, wyprostuj pion,
+  - obrót o 90°/180° i odbicia,
+  - kadrowanie myszą,
+  - cofnij/ponów, siatka i obrysy zdjęć.
+- **Projekcja automatyczna** (domyślnie): program sam dobiera projekcję do zasięgu panoramy.
+- **Prostowanie horyzontu.**
 - **Korekcja fotometryczna:** wyrównanie ekspozycji, balansu kolorów i usuwanie winietowania.
 - **Mieszanie wielopasmowe** (piramidy Laplace'a) i wybór szwów. Opcjonalnie wtapianie liniowe lub ostre szwy.
 - **Kadrowanie** automatyczne (największy prostokąt bez pustych obszarów) lub ręczne.
@@ -47,7 +56,7 @@ Wskazówka: zdjęcia powinny nachodzić na siebie w 20–40%. Jeśli w zdjęciac
 
 ## 🇬🇧 English
 
-Panoramer stitches photo series into panoramas: spherical 360°×180°, cylindrical, rectilinear, Panini, little planet and more. It is a native Windows application written in Rust, with no external dependencies and a Polish/English interface.
+Panoramer stitches photo series into panoramas: spherical 360°×180°, cylindrical, rectilinear, Panini, little planet and more. The engine is written in Rust and the modern UI uses Tauri 2 + Svelte with a GPU (WebGL) real-time preview. Polish/English interface with tooltips for every option.
 
 ### Features
 - **Input:** JPEG, TIFF, PNG, WebP, BMP and **RAW**: ARW, NEF, CR2, DNG, RAF, ORF, RW2, PEF, SRW, 3FR, IIQ… (CR3 is not supported).
@@ -67,10 +76,12 @@ panoramer --help
 ```
 
 ### Building
+Requirements: Rust, Node.js 22.
 ```
-cargo build --release
+npm ci
+npx tauri build
 ```
-Releases are built by GitHub Actions: pushing a `v*` tag produces the installer (Inno Setup) and the portable build.
+Releases are built by GitHub Actions: pushing a `v*` tag produces the NSIS installer (Polish/English) and the portable build.
 
 ## License
 GPL-3.0-or-later.

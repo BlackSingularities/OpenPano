@@ -55,6 +55,7 @@ pub fn load_work(path: &Path) -> Result<WorkImage, StitchError> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PhotoOptions {
     pub exposure: bool,
     pub color: bool,
@@ -128,33 +129,44 @@ pub fn recompute_photo(works: &[Arc<WorkImage>], al: &Alignment, ph: &PhotoOptio
     photometric::estimate(al, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting })
 }
 
-/// Fast preview render from the working images, targeting about `target_mp` megapixels.
-pub fn render_preview(
+/// Render the blended panorama from the working images into an equirectangular map of about
+/// `target_mp` megapixels (identity view), used for the real-time preview.
+pub fn build_sphere(
     works: &[Arc<WorkImage>],
     al: &Aligned,
     rs: &RenderSettings,
     target_mp: f64,
     progress: &Progress,
     cancel: &Cancel,
-) -> Result<RenderOutput, StitchError> {
-    let base = render::layout(&al.alignment, rs, Some(100.0))?;
-    let area = (base.w * base.h) as f64 / 1e4; // canvas area at 1 px per unit
+) -> Result<crate::preview::Sphere, StitchError> {
+    use crate::stitch::geometry::Projection;
+    let mut srs = rs.clone();
+    srs.projection = Projection::Equirectangular;
+    srs.auto_projection = false;
+    srs.full_sphere = false;
+    srs.yaw = 0.0;
+    srs.pitch = 0.0;
+    srs.roll = 0.0;
+    srs.flip_h = false;
+    srs.flip_v = false;
+    srs.crop = render::CropMode::None;
+    srs.bicubic = false;
+    let base = render::layout(&al.alignment, &srs, Some(100.0))?;
+    let area = (base.w * base.h) as f64 / 1e4;
     let s = (target_mp * 1e6 / area.max(1e-9)).sqrt();
-    // never exceed the working images' resolution
     let native = render::native_scale(&al.alignment) * works.iter().map(|w| w.scale).fold(f64::MAX, f64::min);
     let s = s.min(native.max(1.0));
-    let canvas = render::layout(&al.alignment, rs, Some(s))?;
-    let mut prs = rs.clone();
-    prs.bicubic = false;
-    render::render(
+    let canvas = render::layout(&al.alignment, &srs, Some(s))?;
+    let out = render::render(
         &al.alignment,
         &al.photo,
-        &prs,
+        &srs,
         canvas,
         |i| Ok(Source { img: works[i].img.clone(), scale: works[i].scale }),
         progress,
         cancel,
-    )
+    )?;
+    Ok(crate::preview::Sphere::from_render(&out))
 }
 
 pub fn estimate_canvas(al: &Aligned, rs: &RenderSettings) -> Option<(usize, usize)> {

@@ -1,17 +1,6 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
-mod app;
-mod i18n;
-mod imaging;
-mod loader;
-mod output;
-mod project;
-mod raw;
-mod stitch;
-
-use std::path::PathBuf;
-
-const ICON_PNG: &[u8] = include_bytes!("../assets/icon256.png");
+mod commands;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -19,37 +8,46 @@ fn main() {
         attach_console();
         std::process::exit(cli::run(&args));
     }
-    let files: Vec<PathBuf> = args.iter().filter(|a| !a.starts_with('-')).map(PathBuf::from).collect();
+    let files: Vec<String> = args.into_iter().filter(|a| !a.starts_with('-')).collect();
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(commands::Shared::default())
+        .manage(StartupFiles(files))
+        .invoke_handler(tauri::generate_handler![
+            commands::set_language,
+            commands::system_language,
+            commands::load_settings,
+            commands::save_settings,
+            commands::cancel_job,
+            commands::supported_extensions,
+            commands::add_images,
+            commands::remove_images,
+            commands::align,
+            commands::set_photometric,
+            commands::build_sphere,
+            commands::sphere_pixels,
+            commands::layout,
+            commands::render_and_save,
+            commands::any_raw,
+            startup_files,
+            auto_align_flag,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running Panoramer");
+}
 
-    let icon = image::load_from_memory(ICON_PNG).ok().map(|i| {
-        let i = i.to_rgba8();
-        let (w, h) = i.dimensions();
-        egui::IconData { rgba: i.into_raw(), width: w, height: h }
-    });
-    let mut viewport = egui::ViewportBuilder::default()
-        .with_title("Panoramer")
-        .with_inner_size([1440.0, 900.0])
-        .with_min_inner_size([980.0, 620.0])
-        .with_drag_and_drop(true);
-    if let Some(i) = icon {
-        viewport = viewport.with_icon(std::sync::Arc::new(i));
-    }
-    let options = eframe::NativeOptions { viewport, persist_window: true, ..Default::default() };
-    let r = eframe::run_native(
-        "Panoramer",
-        options,
-        Box::new(move |cc| {
-            let mut a = app::App::new(cc);
-            if !files.is_empty() {
-                a.add_paths_initial(files);
-            }
-            Ok(Box::new(a))
-        }),
-    );
-    if let Err(e) = r {
-        eprintln!("Panoramer: {e}");
-        std::process::exit(1);
-    }
+struct StartupFiles(Vec<String>);
+
+#[tauri::command]
+fn startup_files(state: tauri::State<'_, StartupFiles>) -> Vec<String> {
+    state.0.clone()
+}
+
+/// Hidden helper for automated UI checks.
+#[tauri::command]
+fn auto_align_flag() -> bool {
+    std::env::var_os("PANORAMER_AUTOALIGN").is_some()
 }
 
 #[cfg(target_os = "windows")]
@@ -67,13 +65,13 @@ fn attach_console() {
 fn attach_console() {}
 
 mod cli {
-    use crate::i18n::{self, Lang};
-    use crate::output::{OutputFormat, OutputSettings};
-    use crate::project;
-    use crate::stitch::align::AlignSettings;
-    use crate::stitch::geometry::{LensType, Projection};
-    use crate::stitch::render::{BlendMode, CropMode, RenderSettings};
-    use crate::stitch::{Cancel, Progress};
+    use panoramer_core::i18n::{self, Lang};
+    use panoramer_core::output::{OutputFormat, OutputSettings};
+    use panoramer_core::project;
+    use panoramer_core::stitch::align::AlignSettings;
+    use panoramer_core::stitch::geometry::{LensType, Projection};
+    use panoramer_core::stitch::render::{BlendMode, CropMode, RenderSettings};
+    use panoramer_core::stitch::{Cancel, Progress};
     use std::path::PathBuf;
     use std::sync::Arc;
 
@@ -87,7 +85,7 @@ OPTIONS:
     -o, --output <FILE>        Output file (.jpg, .tif, .png, .dng)
     -p, --projection <NAME>    equirectangular | cylindrical | mercator | rectilinear | panini |
                                fisheye | stereographic | little-planet | orthographic |
-                               transverse-mercator | sinusoidal   [default: cylindrical]
+                               transverse-mercator | sinusoidal | auto   [default: auto]
         --full-sphere          Full 360x180 canvas (equirectangular)
     -l, --lens <TYPE>          rectilinear | fisheye | equisolid | fisheye-stereo
         --fov <DEG>            Horizontal field of view of one image (overrides EXIF)
@@ -107,6 +105,7 @@ OPTIONS:
 
     fn parse_projection(s: &str) -> Option<Projection> {
         Some(match s.to_ascii_lowercase().replace('_', "-").as_str() {
+            "auto" => return Some(Projection::Cylindrical),
             "equirectangular" | "spherical" | "equirect" | "360" => Projection::Equirectangular,
             "cylindrical" | "cylinder" => Projection::Cylindrical,
             "mercator" => Projection::Mercator,
@@ -169,8 +168,15 @@ OPTIONS:
                 "-o" | "--output" => out = Some(PathBuf::from(val!(a))),
                 "-p" | "--projection" => {
                     let v = val!(a);
+                    if v.eq_ignore_ascii_case("auto") {
+                        rs.auto_projection = true;
+                        continue;
+                    }
                     match parse_projection(&v) {
-                        Some(p) => rs.projection = p,
+                        Some(p) => {
+                            rs.projection = p;
+                            rs.auto_projection = false;
+                        }
                         None => {
                             eprintln!("unknown projection: {v}");
                             return 2;
@@ -232,9 +238,9 @@ OPTIONS:
             eprintln!("missing --output\n\n{HELP}");
             return 2;
         };
-        let inputs = crate::loader::expand_paths(&inputs);
+        let inputs = panoramer_core::loader::expand_paths(&inputs);
         if inputs.len() < 2 {
-            eprintln!("{}", crate::i18n::tr(crate::i18n::Key::ErrNotEnough));
+            eprintln!("{}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::ErrNotEnough));
             return 2;
         }
         os.format = fmt.unwrap_or_else(|| match out.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
@@ -247,7 +253,7 @@ OPTIONS:
         let t0 = std::time::Instant::now();
         let progress = Progress::default();
         let cancel = Cancel::default();
-        eprintln!("[1/4] {} ({})", crate::i18n::tr(crate::i18n::Key::StageLoading), inputs.len());
+        eprintln!("[1/4] {} ({})", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageLoading), inputs.len());
         let works: Vec<Arc<project::WorkImage>> = {
             use rayon::prelude::*;
             let r: Vec<_> = inputs.par_iter().map(|p| (p, project::load_work(p))).collect();
@@ -260,11 +266,11 @@ OPTIONS:
             }
             v
         };
-        eprintln!("[2/4] {}", crate::i18n::tr(crate::i18n::Key::StageMatching));
+        eprintln!("[2/4] {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageMatching));
         let al = match project::run_align(&works, &st, &ph, &progress, &cancel) {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("{}: {}", crate::i18n::tr(crate::i18n::Key::AlignFailed), e);
+                eprintln!("{}: {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::AlignFailed), e);
                 return 1;
             }
         };
@@ -274,20 +280,20 @@ OPTIONS:
             works.len(),
             al.alignment.rms_px
         );
-        eprintln!("[3/4] {}", crate::i18n::tr(crate::i18n::Key::StageRendering));
+        eprintln!("[3/4] {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageRendering));
         let res = match project::render_full(&works, &al, &rs, &progress, &cancel) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}: {}", crate::i18n::tr(crate::i18n::Key::RenderFailed), e);
+                eprintln!("{}: {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::RenderFailed), e);
                 return 1;
             }
         };
-        eprintln!("[4/4] {} {}", crate::i18n::tr(crate::i18n::Key::StageSaving), out.display());
+        eprintln!("[4/4] {} {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageSaving), out.display());
         match project::save_output(&out, &res, &works, &os) {
             Ok(f) => {
                 eprintln!(
                     "{} {} ({}×{}, {:?}) · {:.1} s",
-                    crate::i18n::tr(crate::i18n::Key::Saved),
+                    panoramer_core::i18n::tr(panoramer_core::i18n::Key::Saved),
                     out.display(),
                     res.image.w,
                     res.image.h,

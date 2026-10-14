@@ -47,6 +47,7 @@ impl OutputFormat {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct OutputSettings {
     pub format: OutputFormat,
     pub jpeg_quality: u8,
@@ -70,6 +71,11 @@ pub struct SourceInfo {
 pub fn gpano_xmp(out: &RenderOutput) -> Option<String> {
     let c = &out.canvas;
     if c.proj != Projection::Equirectangular {
+        return None;
+    }
+    // GPano assumes a level horizon: only yaw rotations of the view are allowed.
+    let up = c.view * crate::stitch::geometry::V3::new(0.0, -1.0, 0.0);
+    if up.y > -0.9999 {
         return None;
     }
     let full_w = (2.0 * std::f64::consts::PI * c.scale).round() as i64;
