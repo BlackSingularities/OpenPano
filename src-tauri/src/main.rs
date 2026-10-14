@@ -57,6 +57,8 @@ OPTIONS:
         --no-exposure          Disable exposure compensation
         --no-vignetting        Disable vignetting correction
         --no-straighten        Disable horizon levelling
+        --no-distortion        Do not estimate lens distortion
+        --no-smart-seams       Plain distance seams instead of ghost-aware graph cut
         --yaw/--pitch/--roll <DEG>  View rotation
         --lang <pl|en>         Message language
     -h, --help                 Show this help
@@ -178,6 +180,8 @@ OPTIONS:
                 }
                 "--no-vignetting" => ph.vignetting = false,
                 "--no-straighten" => st.straighten = false,
+                "--no-distortion" => st.optimize_distortion = false,
+                "--no-smart-seams" => rs.smart_seams = false,
                 "--yaw" => rs.yaw = num!(a),
                 "--pitch" => rs.pitch = num!(a),
                 "--roll" => rs.roll = num!(a),
@@ -226,7 +230,7 @@ OPTIONS:
             v
         };
         eprintln!("[2/4] {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageMatching));
-        let al = match project::run_align(&works, &st, &ph, &progress, &cancel) {
+        let al = match project::run_align(&works, &st, &ph, &[], &progress, &cancel) {
             Ok(a) => a,
             Err(e) => {
                 eprintln!("{}: {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::AlignFailed), e);

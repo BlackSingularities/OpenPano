@@ -5,6 +5,7 @@ pub mod features;
 pub mod geometry;
 pub mod photometric;
 pub mod render;
+pub mod seams;
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};

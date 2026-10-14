@@ -30,6 +30,7 @@ pub fn run() {
             commands::add_image_bytes,
             commands::read_file_bytes,
             commands::cache_dir,
+            commands::work_preview,
             startup_files,
             auto_align_flag,
         ])

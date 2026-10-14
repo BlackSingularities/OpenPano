@@ -117,7 +117,8 @@ jobs:
           cp target/aarch64-apple-ios/release/libpanoramer_lib.a src-tauri/gen/apple/Externals/arm64/release/libapp.a
           PROJ=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
           # neutralise the "Build Rust Code" phase
-          perl -0pi -e 's/shellScript = "[^"]*xcode-script[^"]*";/shellScript = "true";/g' "$PROJ/project.pbxproj"
+          sed -i '' -E '/shellScript = .*xcode-script/s/shellScript = .*;/shellScript = "true";/' "$PROJ/project.pbxproj"
+          if grep -q "xcode-script" "$PROJ/project.pbxproj"; then echo "build phase still present"; grep -n "xcode-script" "$PROJ/project.pbxproj" | head; exit 1; fi
           SCHEME=$(xcodebuild -list -project "$PROJ" | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')
           echo "project: $PROJ scheme: $SCHEME"
           set -o pipefail

@@ -3,7 +3,7 @@
 //! horizon straightening (wave correction).
 
 use super::features::{match_features, Features};
-use super::geometry::{LensType, Rot, V3};
+use super::geometry::{distort, undistort, LensType, Rot, V3};
 use super::{Cancel, Progress, StitchError};
 use nalgebra::{DMatrix, DVector, Matrix3};
 use rayon::prelude::*;
@@ -28,6 +28,8 @@ pub struct AlignSettings {
     /// Neighbour window for sequential matching.
     pub window: usize,
     pub optimize_focal: bool,
+    /// Estimate radial lens distortion (k1, k2) during bundle adjustment.
+    pub optimize_distortion: bool,
     pub straighten: bool,
     pub ransac_threshold_px: f64,
 }
@@ -41,6 +43,7 @@ impl Default for AlignSettings {
             strategy: MatchStrategy::Auto,
             window: 3,
             optimize_focal: true,
+            optimize_distortion: true,
             straighten: true,
             ransac_threshold_px: 3.0,
         }
@@ -65,6 +68,9 @@ pub struct AlignImage {
 #[derive(Clone, Debug)]
 pub struct Camera {
     pub f: f64,
+    /// radial distortion (normalised to the half diagonal)
+    pub k1: f64,
+    pub k2: f64,
     pub rot: Rot,
     pub w: usize,
     pub h: usize,
@@ -75,7 +81,20 @@ impl Camera {
     pub fn ray_world(&self, lens: LensType, x: f64, y: f64) -> V3 {
         let cx = (self.w as f64 - 1.0) / 2.0;
         let cy = (self.h as f64 - 1.0) / 2.0;
-        self.rot * lens.ray(x - cx, y - cy, self.f)
+        let (xu, yu) = undistort(x - cx, y - cy, self.k1, self.k2, self.rnorm());
+        self.rot * lens.ray(xu, yu, self.f)
+    }
+
+    #[inline]
+    pub fn rnorm(&self) -> f64 {
+        ((self.w * self.w + self.h * self.h) as f64).sqrt() / 2.0
+    }
+
+    /// Camera-space ray -> centred (distorted) image coordinates.
+    #[inline]
+    pub fn project_centered(&self, lens: LensType, d: &V3) -> Option<(f64, f64)> {
+        let (x, y) = lens.project(d, self.f)?;
+        distort(x, y, self.k1, self.k2, self.rnorm())
     }
 }
 
@@ -117,7 +136,19 @@ fn centered(img: &AlignImage, kx: f32, ky: f32) -> [f64; 2] {
     [(kx as f64 - cx) / img.scale, (ky as f64 - cy) / img.scale]
 }
 
-pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cancel: &Cancel) -> Result<Alignment, StitchError> {
+/// A user-defined control point pair (full-resolution pixel coordinates, top-left origin).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ManualPoint {
+    pub i: usize,
+    pub j: usize,
+    pub a: [f64; 2],
+    pub b: [f64; 2],
+}
+
+/// Weight of a manual control point relative to an automatic match.
+const MANUAL_WEIGHT: usize = 5;
+
+pub fn align(imgs: &[AlignImage], st: &AlignSettings, manual: &[ManualPoint], progress: &Progress, cancel: &Cancel) -> Result<Alignment, StitchError> {
     let n = imgs.len();
     if n < 2 {
         return Err(StitchError::NotEnoughImages);
@@ -225,16 +256,15 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cance
                 .collect();
             est.extend(ests);
         }
+        // Search the field of view that explains the most matches with a pure rotation. This is
+        // robust to lens distortion and also works for fisheye lenses.
+        let searched = search_focal(imgs, &raw, st, &est);
         let known: Vec<f64> = imgs.iter().filter_map(|im| im.exif_focal).collect();
         for (k, im) in imgs.iter().enumerate() {
             focal[k] = if let Some(f) = im.exif_focal {
                 f
-            } else if !est.is_empty() {
-                let mut e = est.clone();
-                e.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                let med = e[e.len() / 2];
-                // estimates are in full-res pixels of the pair; rescale to this image width
-                med
+            } else if let Some(hfov) = searched {
+                st.lens.focal_from_hfov(hfov, im.full_w as f64)
             } else if !known.is_empty() {
                 known[0]
             } else {
@@ -242,12 +272,12 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cance
                 st.lens.focal_from_hfov(hfov, im.full_w as f64)
             };
         }
-        source = if !est.is_empty() { FocalSource::Estimated } else { FocalSource::Default };
+        source = if searched.is_some() { FocalSource::Estimated } else { FocalSource::Default };
     }
     progress.set_fraction(0.4);
 
     // ---------- robust rotation estimation per pair ----------
-    let pairs: Vec<PairMatch> = raw
+    let mut pairs: Vec<PairMatch> = raw
         .par_iter()
         .filter_map(|(i, j, pts)| {
             let thr = st.ransac_threshold_px / imgs[*i].scale.min(imgs[*j].scale);
@@ -256,6 +286,9 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cance
             let rays: Vec<(V3, V3)> = pts.iter().map(|(a, b)| (st.lens.ray(a[0], a[1], fi), st.lens.ray(b[0], b[1], fj))).collect();
             let (_r, inl) = ransac_rotation(&rays, ang_thr, 800)?;
             let need = (8.0 + 0.3 * pts.len() as f64).max(15.0);
+            if std::env::var_os("PANORAMER_DEBUG").is_some() {
+                eprintln!("pair {}-{}: matches {} inliers {} need {:.0} f {:.0}", i, j, pts.len(), inl.len(), need, fi);
+            }
             if (inl.len() as f64) < need {
                 return None;
             }
@@ -267,6 +300,27 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cance
         .collect();
     cancel.check()?;
     progress.set_fraction(0.5);
+    // ---------- manual control points ----------
+    {
+        let mut groups: std::collections::BTreeMap<(usize, usize), Vec<([f64; 2], [f64; 2])>> = Default::default();
+        for m in manual {
+            if m.i == m.j || m.i >= n || m.j >= n {
+                continue;
+            }
+            let c = |k: usize, p: [f64; 2]| [p[0] - (imgs[k].full_w as f64 - 1.0) / 2.0, p[1] - (imgs[k].full_h as f64 - 1.0) / 2.0];
+            let (i, j, a, b) = if m.i < m.j { (m.i, m.j, m.a, m.b) } else { (m.j, m.i, m.b, m.a) };
+            groups.entry((i, j)).or_default().push((c(i, a), c(j, b)));
+        }
+        for ((i, j), pts) in groups {
+            let rep: Vec<([f64; 2], [f64; 2])> = pts.iter().flat_map(|p| std::iter::repeat(*p).take(MANUAL_WEIGHT)).collect();
+            if let Some(p) = pairs.iter_mut().find(|p| p.i == i && p.j == j) {
+                p.pts.extend(rep);
+                p.confidence = p.confidence.max(3.0);
+            } else if pts.len() >= 2 {
+                pairs.push(PairMatch { i, j, pts: rep, confidence: 3.0 });
+            }
+        }
+    }
     if pairs.is_empty() {
         return Err(StitchError::NoOverlap);
     }
@@ -347,11 +401,27 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cance
         gfocal[g] = v.iter().sum::<f64>() / v.len() as f64;
     }
     let opt_focal = st.optimize_focal && source != FocalSource::Manual;
-    let rms = bundle_adjust(&pairs, &mut rots, &mut gfocal, &group_of, reference, st.lens, opt_focal, progress, cancel)?;
+    let mut intr: Vec<Intrinsics> = gfocal.iter().map(|&f| Intrinsics { f, k1: 0.0, k2: 0.0 }).collect();
+    let rnorm: Vec<f64> = imgs.iter().map(|im| ((im.full_w * im.full_w + im.full_h * im.full_h) as f64).sqrt() / 2.0).collect();
+    // First solve without distortion for a stable start, then refine with it.
+    let mut rms = bundle_adjust(&pairs, &mut rots, &mut intr, &group_of, &rnorm, reference, st.lens, opt_focal, false, progress, cancel)?;
+    if st.optimize_distortion && pairs.iter().map(|p| p.pts.len()).sum::<usize>() > 60 {
+        let (r0, i0) = (rots.clone(), intr.clone());
+        let rms2 = bundle_adjust(&pairs, &mut rots, &mut intr, &group_of, &rnorm, reference, st.lens, opt_focal, true, progress, cancel)?;
+        if rms2 <= rms {
+            rms = rms2;
+        } else {
+            rots.copy_from_slice(&r0);
+            intr = i0;
+        }
+    }
 
     let mut cameras: Vec<Option<Camera>> = (0..n)
         .map(|k| {
-            rots[k].map(|r| Camera { f: gfocal[group_of[k]], rot: r, w: imgs[k].full_w, h: imgs[k].full_h })
+            rots[k].map(|r| {
+                let it = intr[group_of[k]];
+                Camera { f: it.f, k1: it.k1, k2: it.k2, rot: r, w: imgs[k].full_w, h: imgs[k].full_h }
+            })
         })
         .collect();
 
@@ -361,6 +431,60 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, progress: &Progress, cance
     center_yaw(&mut cameras);
     progress.set_fraction(1.0);
     Ok(Alignment { cameras, lens: st.lens, pairs, rms_px: rms, focal_source: source })
+}
+
+/// Returns the horizontal field of view (degrees) maximising rotation-model inliers.
+fn search_focal(imgs: &[AlignImage], raw: &[(usize, usize, Vec<([f64; 2], [f64; 2])>)], st: &AlignSettings, homography_est: &[f64]) -> Option<f64> {
+    let mut best_pairs: Vec<&(usize, usize, Vec<([f64; 2], [f64; 2])>)> = raw.iter().filter(|p| p.2.len() >= 20).collect();
+    best_pairs.sort_by(|a, b| b.2.len().cmp(&a.2.len()));
+    best_pairs.truncate(8);
+    if best_pairs.is_empty() {
+        return None;
+    }
+    let w = imgs[0].full_w as f64;
+    let score = |hfov: f64| -> usize {
+        best_pairs
+            .par_iter()
+            .map(|(i, j, pts)| {
+                let fi = st.lens.focal_from_hfov(hfov, imgs[*i].full_w as f64);
+                let fj = st.lens.focal_from_hfov(hfov, imgs[*j].full_w as f64);
+                let thr = 2.0 * st.ransac_threshold_px / imgs[*i].scale.min(imgs[*j].scale) / fi.min(fj);
+                let rays: Vec<(V3, V3)> = pts.iter().map(|(a, b)| (st.lens.ray(a[0], a[1], fi), st.lens.ray(b[0], b[1], fj))).collect();
+                ransac_rotation(&rays, thr, 250).map(|(_, inl)| inl.len()).unwrap_or(0)
+            })
+            .sum()
+    };
+    let (lo, hi) = if st.lens.is_fisheye() { (60.0f64, 230.0f64) } else { (12.0f64, 130.0f64) };
+    let mut cands: Vec<f64> = (0..36).map(|k| lo * (hi / lo).powf(k as f64 / 35.0)).collect();
+    for f in homography_est {
+        let h = st.lens.hfov_from_focal(*f, w);
+        if h.is_finite() && h > lo && h < hi {
+            cands.push(h);
+        }
+    }
+    let mut best = (0usize, 0.0f64);
+    for h in cands {
+        let s = score(h);
+        if s > best.0 {
+            best = (s, h);
+        }
+    }
+    if best.0 == 0 {
+        return None;
+    }
+    // refine around the best value
+    let c = best.1;
+    for k in -6..=6 {
+        let h = c * (1.0 + 0.012 * k as f64);
+        let s = score(h);
+        if s > best.0 {
+            best = (s, h);
+        }
+    }
+    if std::env::var_os("PANORAMER_DEBUG").is_some() {
+        eprintln!("focal search: hfov {:.2} deg, score {}", best.1, best.0);
+    }
+    Some(best.1)
 }
 
 fn subsample_spread(v: &mut Vec<([f64; 2], [f64; 2])>, max: usize) {
@@ -619,20 +743,36 @@ fn focal_from_homography(h: &Matrix3<f64>) -> Option<f64> {
     }
 }
 
+/// Intrinsics shared by a group of images (same camera, lens and focal length).
+#[derive(Clone, Copy, Debug)]
+pub struct Intrinsics {
+    pub f: f64,
+    pub k1: f64,
+    pub k2: f64,
+}
+
+/// Ray for a centred pixel position given intrinsics (radial distortion is removed first).
+#[inline]
+pub fn intr_ray(lens: LensType, x: f64, y: f64, it: &Intrinsics, rnorm: f64) -> V3 {
+    let (xu, yu) = undistort(x, y, it.k1, it.k2, rnorm);
+    lens.ray(xu, yu, it.f)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn bundle_adjust(
     pairs: &[PairMatch],
     rots: &mut [Option<Rot>],
-    gfocal: &mut [f64],
+    intr: &mut [Intrinsics],
     group_of: &[usize],
+    rnorm: &[f64],
     reference: usize,
     lens: LensType,
     opt_focal: bool,
+    opt_dist: bool,
     progress: &Progress,
     cancel: &Cancel,
 ) -> Result<f64, StitchError> {
     let n = rots.len();
-    // parameter indices
     let mut rot_idx = vec![usize::MAX; n];
     let mut np = 0;
     for k in 0..n {
@@ -647,129 +787,138 @@ fn bundle_adjust(
         v.dedup();
         v
     };
-    let mut f_idx = vec![usize::MAX; gfocal.len()];
-    if opt_focal {
-        for &g in &used_groups {
-            f_idx[g] = np;
+    // per group: [log f, k1, k2] -> indices (usize::MAX = fixed)
+    let mut g_idx = vec![[usize::MAX; 3]; intr.len()];
+    for &g in &used_groups {
+        if opt_focal {
+            g_idx[g][0] = np;
             np += 1;
+        }
+        if opt_dist {
+            g_idx[g][1] = np;
+            g_idx[g][2] = np + 1;
+            np += 2;
         }
     }
     let fscale = {
-        let v: Vec<f64> = used_groups.iter().map(|&g| gfocal[g]).collect();
+        let v: Vec<f64> = used_groups.iter().map(|&g| intr[g].f).collect();
         v.iter().sum::<f64>() / v.len().max(1) as f64
     };
     let huber = 3.0; // pixels
+    // weak prior keeping distortion small (in residual units, per point count)
+    let total_pts: usize = pairs.iter().map(|p| p.pts.len()).sum();
+    let dist_prior = (total_pts as f64).sqrt() * fscale * 0.02;
 
-    let residual = |rots: &[Option<Rot>], gf: &[f64], p: &PairMatch, m: &([f64; 2], [f64; 2])| -> V3 {
-        let ri = rots[p.i].unwrap();
-        let rj = rots[p.j].unwrap();
-        let a = ri * lens.ray(m.0[0], m.0[1], gf[group_of[p.i]]);
-        let b = rj * lens.ray(m.1[0], m.1[1], gf[group_of[p.j]]);
+    let residual = |rots: &[Option<Rot>], it: &[Intrinsics], p: &PairMatch, m: &([f64; 2], [f64; 2])| -> V3 {
+        let a = rots[p.i].unwrap() * intr_ray(lens, m.0[0], m.0[1], &it[group_of[p.i]], rnorm[p.i]);
+        let b = rots[p.j].unwrap() * intr_ray(lens, m.1[0], m.1[1], &it[group_of[p.j]], rnorm[p.j]);
         (a - b) * fscale
     };
-    let cost = |rots: &[Option<Rot>], gf: &[f64]| -> f64 {
-        pairs
-            .par_iter()
-            .map(|p| {
-                p.pts
-                    .iter()
-                    .map(|m| {
-                        let e = residual(rots, gf, p, m).norm();
-                        if e < huber {
-                            e * e
-                        } else {
-                            2.0 * huber * e - huber * huber
-                        }
-                    })
-                    .sum::<f64>()
-            })
-            .sum()
+    let robust = |e: f64| if e < huber { e * e } else { 2.0 * huber * e - huber * huber };
+    let cost = |rots: &[Option<Rot>], it: &[Intrinsics]| -> f64 {
+        let data: f64 = pairs.par_iter().map(|p| p.pts.iter().map(|m| robust(residual(rots, it, p, m).norm())).sum::<f64>()).sum();
+        let prior: f64 = if opt_dist { used_groups.iter().map(|&g| (it[g].k1.powi(2) + it[g].k2.powi(2)) * dist_prior * dist_prior).sum() } else { 0.0 };
+        data + prior
     };
-    let count: usize = pairs.iter().map(|p| p.pts.len()).sum();
-    let apply = |rots: &[Option<Rot>], gf: &[f64], delta: &DVector<f64>| -> (Vec<Option<Rot>>, Vec<f64>) {
+    let apply = |rots: &[Option<Rot>], it: &[Intrinsics], delta: &DVector<f64>| -> (Vec<Option<Rot>>, Vec<Intrinsics>) {
         let mut r2 = rots.to_vec();
         for k in 0..n {
             if rot_idx[k] != usize::MAX {
                 let i = rot_idx[k];
-                let d = V3::new(delta[i], delta[i + 1], delta[i + 2]);
-                r2[k] = Some(Rot::from_scaled_axis(d) * r2[k].unwrap());
+                r2[k] = Some(Rot::from_scaled_axis(V3::new(delta[i], delta[i + 1], delta[i + 2])) * r2[k].unwrap());
             }
         }
-        let mut f2 = gf.to_vec();
-        for g in 0..gf.len() {
-            if f_idx[g] != usize::MAX {
-                f2[g] = gf[g] * delta[f_idx[g]].exp();
+        let mut i2 = it.to_vec();
+        for g in 0..it.len() {
+            if g_idx[g][0] != usize::MAX {
+                i2[g].f = it[g].f * delta[g_idx[g][0]].exp();
+            }
+            if g_idx[g][1] != usize::MAX {
+                i2[g].k1 = (it[g].k1 + delta[g_idx[g][1]]).clamp(-0.6, 0.6);
+                i2[g].k2 = (it[g].k2 + delta[g_idx[g][2]]).clamp(-0.6, 0.6);
             }
         }
-        (r2, f2)
+        (r2, i2)
     };
 
-    let mut cur_cost = cost(rots, gfocal);
+    let count = total_pts;
+    let mut cur_cost = cost(rots, intr);
     let mut lambda = 1e-3;
-    let eps = 1e-6;
-    let max_iter = 60;
+    let eps: f64 = 1e-6;
+    let max_iter = 80;
     for iter in 0..max_iter {
         cancel.check()?;
         progress.set_fraction(0.5 + 0.45 * iter as f32 / max_iter as f32);
-        // Build normal equations
-        let (jtj, jtr) = pairs
+        let (mut jtj, mut jtr) = pairs
             .par_iter()
             .fold(
                 || (DMatrix::<f64>::zeros(np, np), DVector::<f64>::zeros(np)),
                 |(mut jtj, mut jtr), p| {
-                    // local parameter list: (global index, kind)
-                    let mut locals: Vec<(usize, u8, usize)> = Vec::new(); // (gidx, kind 0=rot i,1=rot j,2=f i,3=f j), axis
+                    // local parameters: (global index, perturbation kind)
+                    // kinds: 0..3 rot i axis, 3..6 rot j axis, 6..9 intr of group i, 9..12 intr of group j
+                    let mut locals: Vec<(usize, usize)> = Vec::new();
                     if rot_idx[p.i] != usize::MAX {
-                        for a in 0..3 {
-                            locals.push((rot_idx[p.i] + a, 0, a));
-                        }
+                        (0..3).for_each(|a| locals.push((rot_idx[p.i] + a, a)));
                     }
                     if rot_idx[p.j] != usize::MAX {
-                        for a in 0..3 {
-                            locals.push((rot_idx[p.j] + a, 1, a));
-                        }
+                        (0..3).for_each(|a| locals.push((rot_idx[p.j] + a, 3 + a)));
                     }
                     let gi = group_of[p.i];
                     let gj = group_of[p.j];
-                    if f_idx[gi] != usize::MAX {
-                        locals.push((f_idx[gi], 2, 0));
-                    }
-                    if f_idx[gj] != usize::MAX && gj != gi {
-                        locals.push((f_idx[gj], 3, 0));
+                    for c in 0..3 {
+                        if g_idx[gi][c] != usize::MAX {
+                            locals.push((g_idx[gi][c], 6 + c));
+                        }
+                        if gj != gi && g_idx[gj][c] != usize::MAX {
+                            locals.push((g_idx[gj][c], 9 + c));
+                        }
                     }
                     let ri = rots[p.i].unwrap();
                     let rj = rots[p.j].unwrap();
+                    let (ii, ij) = (intr[gi], intr[gj]);
+                    let perturb = |it: Intrinsics, c: usize| -> Intrinsics {
+                        let mut o = it;
+                        match c {
+                            0 => o.f *= eps.exp(),
+                            1 => o.k1 += eps,
+                            _ => o.k2 += eps,
+                        }
+                        o
+                    };
                     for m in &p.pts {
-                        let fi = gfocal[gi];
-                        let fj = gfocal[gj];
-                        let ray_i = lens.ray(m.0[0], m.0[1], fi);
-                        let ray_j = lens.ray(m.1[0], m.1[1], fj);
+                        let ray_i = intr_ray(lens, m.0[0], m.0[1], &ii, rnorm[p.i]);
+                        let ray_j = intr_ray(lens, m.1[0], m.1[1], &ij, rnorm[p.j]);
                         let a = ri * ray_i;
                         let b = rj * ray_j;
                         let r = (a - b) * fscale;
                         let e = r.norm();
                         let w = if e < huber { 1.0 } else { huber / e };
                         let mut cols: Vec<(usize, V3)> = Vec::with_capacity(locals.len());
-                        for &(gidx, kind, axis) in &locals {
-                            let mut dv = V3::zeros();
-                            dv[axis] = eps;
-                            let dr = Rot::from_scaled_axis(dv);
+                        for &(gidx, kind) in &locals {
                             let col = match kind {
-                                0 => ((dr * a) - a) * fscale / eps,
-                                1 => -((dr * b) - b) * fscale / eps,
-                                2 => {
-                                    let fi2 = fi * eps.exp();
-                                    let a2 = ri * lens.ray(m.0[0], m.0[1], fi2);
+                                0..=2 => {
+                                    let mut dv = V3::zeros();
+                                    dv[kind] = eps;
+                                    ((Rot::from_scaled_axis(dv) * a) - a) * fscale / eps
+                                }
+                                3..=5 => {
+                                    let mut dv = V3::zeros();
+                                    dv[kind - 3] = eps;
+                                    -((Rot::from_scaled_axis(dv) * b) - b) * fscale / eps
+                                }
+                                6..=8 => {
+                                    let it2 = perturb(ii, kind - 6);
+                                    let a2 = ri * intr_ray(lens, m.0[0], m.0[1], &it2, rnorm[p.i]);
                                     let mut c = (a2 - a) * fscale / eps;
                                     if gj == gi {
-                                        let b2 = rj * lens.ray(m.1[0], m.1[1], fi2);
+                                        let b2 = rj * intr_ray(lens, m.1[0], m.1[1], &it2, rnorm[p.j]);
                                         c -= (b2 - b) * fscale / eps;
                                     }
                                     c
                                 }
                                 _ => {
-                                    let fj2 = fj * eps.exp();
-                                    let b2 = rj * lens.ray(m.1[0], m.1[1], fj2);
+                                    let it2 = perturb(ij, kind - 9);
+                                    let b2 = rj * intr_ray(lens, m.1[0], m.1[1], &it2, rnorm[p.j]);
                                     -(b2 - b) * fscale / eps
                                 }
                             };
@@ -789,12 +938,19 @@ fn bundle_adjust(
                     (jtj, jtr)
                 },
             )
-            .reduce(
-                || (DMatrix::<f64>::zeros(np, np), DVector::<f64>::zeros(np)),
-                |(a1, b1), (a2, b2)| (a1 + a2, b1 + b2),
-            );
+            .reduce(|| (DMatrix::<f64>::zeros(np, np), DVector::<f64>::zeros(np)), |(a1, b1), (a2, b2)| (a1 + a2, b1 + b2));
         if np == 0 {
             break;
+        }
+        // distortion prior: residual = k * dist_prior
+        if opt_dist {
+            for &g in &used_groups {
+                for (c, val) in [(1usize, intr[g].k1), (2, intr[g].k2)] {
+                    let gi = g_idx[g][c];
+                    jtj[(gi, gi)] += dist_prior * dist_prior;
+                    jtr[gi] += dist_prior * dist_prior * val;
+                }
+            }
         }
         let mut improved = false;
         for _ in 0..10 {
@@ -807,17 +963,17 @@ fn bundle_adjust(
                 continue;
             };
             let delta = -chol.solve(&jtr);
-            let (r2, f2) = apply(rots, gfocal, &delta);
-            let c2 = cost(&r2, &f2);
+            let (r2, i2) = apply(rots, intr, &delta);
+            let c2 = cost(&r2, &i2);
             if c2 < cur_cost {
                 let rel = (cur_cost - c2) / cur_cost.max(1e-12);
                 rots.copy_from_slice(&r2);
-                gfocal.copy_from_slice(&f2);
+                intr.copy_from_slice(&i2);
                 cur_cost = c2;
                 lambda = (lambda * 0.3).max(1e-9);
                 improved = true;
                 if rel < 1e-7 {
-                    return Ok((cur_cost / count.max(1) as f64).sqrt());
+                    return Ok(rms_of(pairs, rots, intr, group_of, rnorm, lens, count));
                 }
                 break;
             } else {
@@ -828,7 +984,26 @@ fn bundle_adjust(
             break;
         }
     }
-    Ok((cur_cost / count.max(1) as f64).sqrt())
+    Ok(rms_of(pairs, rots, intr, group_of, rnorm, lens, count))
+}
+
+/// RMS reprojection error in pixels (angular error × focal length).
+fn rms_of(pairs: &[PairMatch], rots: &[Option<Rot>], intr: &[Intrinsics], group_of: &[usize], rnorm: &[f64], lens: LensType, count: usize) -> f64 {
+    let s: f64 = pairs
+        .par_iter()
+        .map(|p| {
+            let fi = intr[group_of[p.i]].f;
+            p.pts
+                .iter()
+                .map(|m| {
+                    let a = rots[p.i].unwrap() * intr_ray(lens, m.0[0], m.0[1], &intr[group_of[p.i]], rnorm[p.i]);
+                    let b = rots[p.j].unwrap() * intr_ray(lens, m.1[0], m.1[1], &intr[group_of[p.j]], rnorm[p.j]);
+                    ((a - b).norm() * fi).powi(2)
+                })
+                .sum::<f64>()
+        })
+        .sum();
+    (s / count.max(1) as f64).sqrt()
 }
 
 /// Straighten the panorama so the horizon is level (OpenCV-style horizontal wave correction).

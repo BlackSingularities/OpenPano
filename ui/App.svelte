@@ -8,6 +8,8 @@
   import Inspector from "./components/Inspector.svelte";
   import Viewer from "./components/Viewer.svelte";
   import Tooltip from "./components/Tooltip.svelte";
+  import ControlPoints from "./components/ControlPoints.svelte";
+  import QualityBanner from "./components/QualityBanner.svelte";
   import { t, getLang } from "./lib/i18n.svelte";
   import { THEMES, type ThemeId } from "./lib/theme";
   import {
@@ -17,7 +19,7 @@
 
   const AUTHOR = "https://redzikowski.com";
   const REPO = "https://github.com/BlackSingularities/Panoramer";
-  const VERSION = "2.1.0";
+  const VERSION = "2.2.0";
 
   let menuOpen = $state(false);
   let winW = $state(window.innerWidth);
@@ -246,6 +248,7 @@
         {:else}
           <div class="center">
         {#if app.align}
+          <QualityBanner />
           <Viewer />
         {:else}
           <div class="welcome">
@@ -262,6 +265,7 @@
                   <button class="btn lg" onclick={pickFiles}><Icon name="plus" size={18} />{t("addImages")}</button>
                 {/if}
               </div>
+              {#if app.alignFailed}<QualityBanner />{/if}
               {#if app.job?.kind === "align"}
                 <div class="wprog">
                   <div class="bar"><div class="fill" style="width:{app.job.fraction * 100}%"></div></div>
@@ -280,6 +284,7 @@
       <div class="left"><ImageList /></div>
       <div class="center">
         {#if app.align}
+          <QualityBanner />
           <Viewer />
         {:else}
           <div class="welcome">
@@ -354,6 +359,8 @@
       </div>
     {/each}
   </div>
+
+  {#if app.dialogs.cp}<ControlPoints />{/if}
 
   {#if app.dialogs.about}
     <!-- svelte-ignore a11y_click_events_have_key_events -->

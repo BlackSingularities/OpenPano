@@ -362,6 +362,45 @@ fn inv_stereo(u: f64, v: f64) -> V3 {
     V3::new(u / d, v / d, (1.0 - r2) / d)
 }
 
+/// Remove radial distortion: distorted centred pixel -> undistorted centred pixel.
+/// Model: r_u = r_d (1 + k1 r_d^2 + k2 r_d^4), radii normalised by `rnorm` (half diagonal).
+#[inline]
+pub fn undistort(x: f64, y: f64, k1: f64, k2: f64, rnorm: f64) -> (f64, f64) {
+    if k1 == 0.0 && k2 == 0.0 {
+        return (x, y);
+    }
+    let r2 = (x * x + y * y) / (rnorm * rnorm);
+    let s = 1.0 + k1 * r2 + k2 * r2 * r2;
+    (x * s, y * s)
+}
+
+/// Apply radial distortion (inverse of [`undistort`]) with Newton iterations.
+#[inline]
+pub fn distort(xu: f64, yu: f64, k1: f64, k2: f64, rnorm: f64) -> Option<(f64, f64)> {
+    if k1 == 0.0 && k2 == 0.0 {
+        return Some((xu, yu));
+    }
+    let ru = (xu * xu + yu * yu).sqrt() / rnorm;
+    if ru < 1e-12 {
+        return Some((xu, yu));
+    }
+    let mut rd = ru;
+    for _ in 0..8 {
+        let r2 = rd * rd;
+        let f = rd * (1.0 + k1 * r2 + k2 * r2 * r2) - ru;
+        let df = 1.0 + 3.0 * k1 * r2 + 5.0 * k2 * r2 * r2;
+        if df <= 1e-6 {
+            return None;
+        }
+        rd -= f / df;
+    }
+    if !(rd.is_finite()) || rd < 0.0 {
+        return None;
+    }
+    let s = rd / ru;
+    Some((xu * s, yu * s))
+}
+
 /// Rotation from yaw (around y), pitch (around x, positive = looking up) and roll (around z),
 /// in degrees. Maps view-space directions to world directions.
 pub fn ypr_rotation(yaw: f64, pitch: f64, roll: f64) -> Rot {
@@ -469,6 +508,17 @@ mod tests {
         let (y, p) = solve_grab(&d, &q, 0.0, 0.0, 0.0);
         let back = ypr_rotation(y, p, 0.0) * q;
         assert!((back - d).norm() < 1e-6);
+    }
+
+    #[test]
+    fn distortion_roundtrip() {
+        for (k1, k2) in [(-0.1, 0.02), (0.08, -0.01), (0.0, 0.0)] {
+            for (x, y) in [(300.0, 200.0), (-700.0, 450.0)] {
+                let (xu, yu) = undistort(x, y, k1, k2, 1000.0);
+                let (xd, yd) = distort(xu, yu, k1, k2, 1000.0).unwrap();
+                assert!((xd - x).abs() < 1e-6 && (yd - y).abs() < 1e-6);
+            }
+        }
     }
 
     #[test]

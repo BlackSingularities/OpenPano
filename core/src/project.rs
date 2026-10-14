@@ -73,7 +73,7 @@ pub struct Aligned {
     pub photo: Photometric,
 }
 
-pub fn run_align(works: &[Arc<WorkImage>], st: &AlignSettings, ph: &PhotoOptions, progress: &Progress, cancel: &Cancel) -> Result<Aligned, StitchError> {
+pub fn run_align(works: &[Arc<WorkImage>], st: &AlignSettings, ph: &PhotoOptions, manual: &[align::ManualPoint], progress: &Progress, cancel: &Cancel) -> Result<Aligned, StitchError> {
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StageFeatures));
     let done = std::sync::atomic::AtomicUsize::new(0);
     let n = works.len();
@@ -109,7 +109,7 @@ pub fn run_align(works: &[Arc<WorkImage>], st: &AlignSettings, ph: &PhotoOptions
         .collect();
     cancel.check()?;
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StageMatching));
-    let alignment = align::align(&aimgs, st, progress, cancel)?;
+    let alignment = align::align(&aimgs, st, manual, progress, cancel)?;
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StagePhotometric));
     let work: Vec<RgbImage> = works.iter().map(|w| w.img.clone()).collect();
     let scales: Vec<f64> = works.iter().map(|w| w.scale).collect();
@@ -163,6 +163,7 @@ pub fn build_sphere(
         &srs,
         canvas,
         |i| Ok(Source { img: works[i].img.clone(), scale: works[i].scale }),
+        Some(&|i: usize| Some(Source { img: works[i].img.clone(), scale: works[i].scale })),
         progress,
         cancel,
     )?;
@@ -197,6 +198,7 @@ pub fn render_full(
             let scale = l.image.w as f64 / works[i].full_w as f64;
             Ok(Source { img: l.image, scale })
         },
+        Some(&|i: usize| Some(Source { img: works[i].img.clone(), scale: works[i].scale })),
         progress,
         cancel,
     )

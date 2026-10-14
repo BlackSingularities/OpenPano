@@ -51,6 +51,8 @@ pub struct RenderSettings {
     /// Mirror the result horizontally / vertically.
     pub flip_h: bool,
     pub flip_v: bool,
+    /// Route seams around moving objects / parallax (graph cut).
+    pub smart_seams: bool,
 }
 
 impl Default for RenderSettings {
@@ -72,6 +74,7 @@ impl Default for RenderSettings {
             bicubic: true,
             flip_h: false,
             flip_v: false,
+            smart_seams: true,
         }
     }
 }
@@ -89,13 +92,18 @@ pub struct Canvas {
     pub h: usize,
     /// Per-image bounding boxes in canvas pixels (x0, y0, x1, y1), None if not visible.
     pub boxes: Vec<Option<(usize, usize, usize, usize)>>,
+    /// Horizontal coordinate wraps around ±180° (extended 360° canvas).
+    pub wrap_u: bool,
 }
 
 impl Canvas {
     #[inline]
     pub fn pixel_dir(&self, px: f64, py: f64) -> Option<V3> {
-        let u = self.u0 + (px + 0.5) / self.scale;
+        let mut u = self.u0 + (px + 0.5) / self.scale;
         let v = self.v0 + (py + 0.5) / self.scale;
+        if self.wrap_u {
+            u = (u + PI).rem_euclid(2.0 * PI) - PI;
+        }
         self.proj.inverse(u, v).map(|d| self.view.inverse() * d)
     }
 
@@ -235,7 +243,7 @@ pub fn layout(al: &Alignment, st: &RenderSettings, px_scale: Option<f64>) -> Res
             let hh = cam.h as f64 / 2.0;
             for (pole, top) in [(V3::new(0.0, -1.0, 0.0), true), (V3::new(0.0, 1.0, 0.0), false)] {
                 let c = cam_inv * (inv_view * pole);
-                if let Some((x, y)) = al.lens.project(&c, cam.f) {
+                if let Some((x, y)) = cam.project_centered(al.lens, &c) {
                     if x.abs() < hw && y.abs() < hh {
                         if top {
                             bv0 = lv0;
@@ -289,7 +297,7 @@ pub fn layout(al: &Alignment, st: &RenderSettings, px_scale: Option<f64>) -> Res
             })
         })
         .collect();
-    Ok(Canvas { proj, view, u0, v0, scale, w, h, boxes })
+    Ok(Canvas { proj, view, u0, v0, scale, w, h, boxes, wrap_u: false })
 }
 
 pub fn boundary_samples(w: usize, h: usize, edge: usize, grid: usize) -> Vec<(f64, f64)> {
@@ -333,7 +341,7 @@ pub struct RenderOutput {
     pub crop: (usize, usize, usize, usize),
 }
 
-struct Mapper<'a> {
+pub struct Mapper<'a> {
     cam: &'a super::align::Camera,
     lens: LensType,
     inv_rot: Rot,
@@ -345,7 +353,7 @@ struct Mapper<'a> {
 }
 
 impl<'a> Mapper<'a> {
-    fn new(cam: &'a super::align::Camera, lens: LensType, circular: bool) -> Self {
+    pub fn new(cam: &'a super::align::Camera, lens: LensType, circular: bool) -> Self {
         Self {
             cam,
             lens,
@@ -360,9 +368,9 @@ impl<'a> Mapper<'a> {
 
     /// World direction -> centred full-res image coordinates and seam weight.
     #[inline]
-    fn map(&self, d: &V3) -> Option<(f64, f64, f32)> {
+    pub fn map(&self, d: &V3) -> Option<(f64, f64, f32)> {
         let c = self.inv_rot * d;
-        let (x, y) = self.lens.project(&c, self.cam.f)?;
+        let (x, y) = self.cam.project_centered(self.lens, &c)?;
         let xn = x / self.hw;
         let yn = y / self.hh;
         if xn.abs() >= 1.0 || yn.abs() >= 1.0 {
@@ -382,7 +390,8 @@ impl<'a> Mapper<'a> {
     }
 }
 
-const NONE: u16 = u16::MAX;
+pub const NONE_LABEL: u16 = u16::MAX;
+const NONE: u16 = NONE_LABEL;
 
 pub fn render(
     al: &Alignment,
@@ -390,9 +399,27 @@ pub fn render(
     st: &RenderSettings,
     canvas: Canvas,
     mut load: impl FnMut(usize) -> Result<Source, StitchError>,
+    seam_src: Option<&(dyn Fn(usize) -> Option<Source> + Sync)>,
     progress: &Progress,
     cancel: &Cancel,
 ) -> Result<RenderOutput, StitchError> {
+    let levels = match st.blend {
+        BlendMode::Multiband => {
+            let auto = ((canvas.w.min(canvas.h) as f64 / 8.0).log2().floor() as isize).clamp(1, 7) as usize;
+            if st.bands == 0 {
+                auto
+            } else {
+                st.bands.min(auto.max(1) + 2).clamp(1, 10)
+            }
+        }
+        _ => 0,
+    };
+    // A complete 360° strip is rendered on a canvas extended by wrapped margins, so blending and
+    // seams continue across ±180°; the margins are cut off afterwards.
+    let orig_canvas = canvas.clone();
+    let full360 = canvas.proj.wraps() && (canvas.w as f64 / canvas.scale) >= 2.0 * PI - 2.0 / canvas.scale;
+    let ext = if full360 { ((3usize << levels) + 16).min(canvas.w / 2) } else { 0 };
+    let canvas = if ext > 0 { extend_canvas(&canvas, ext) } else { canvas };
     let (cw, ch) = (canvas.w, canvas.h);
     let order: Vec<usize> = (0..al.cameras.len()).filter(|&i| al.cameras[i].is_some() && canvas.boxes[i].is_some()).collect();
     if order.is_empty() {
@@ -423,19 +450,13 @@ pub fn render(
         progress.set_fraction(0.1 * (k + 1) as f32 / order.len() as f32);
     }
     drop(best);
+    if st.smart_seams && st.blend != BlendMode::Feather {
+        if let Some(src) = seam_src {
+            super::seams::refine(&mut label, &canvas, al, photo, st.circular_fisheye, &order, src, cancel)?;
+        }
+    }
 
     // ---------- pass 2: warp + blend ----------
-    let levels = match st.blend {
-        BlendMode::Multiband => {
-            let auto = ((cw.min(ch) as f64 / 8.0).log2().floor() as isize).clamp(1, 7) as usize;
-            if st.bands == 0 {
-                auto
-            } else {
-                st.bands.min(auto.max(1) + 2).clamp(1, 10)
-            }
-        }
-        _ => 0,
-    };
     let mut acc = Accumulator::new(cw, ch, levels);
     for (k, &i) in order.iter().enumerate() {
         cancel.check()?;
@@ -501,14 +522,28 @@ pub fn render(
     cancel.check()?;
     progress.set_fraction(0.92);
     let mut image = acc.finish();
-    let alpha: Vec<u8> = label.par_iter().map(|&l| if l == NONE { 0 } else { 255 }).collect();
+    let mut alpha: Vec<u8> = label.par_iter().map(|&l| if l == NONE { 0 } else { 255 }).collect();
+    drop(label);
+    let (canvas, cw, ch) = if ext > 0 {
+        let ow = orig_canvas.w;
+        let mut img = RgbImage::new(ow, ch);
+        let mut a = vec![0u8; ow * ch];
+        for y in 0..ch {
+            img.data[y * ow..(y + 1) * ow].copy_from_slice(&image.data[y * cw + ext..y * cw + ext + ow]);
+            a[y * ow..(y + 1) * ow].copy_from_slice(&alpha[y * cw + ext..y * cw + ext + ow]);
+        }
+        image = img;
+        alpha = a;
+        (orig_canvas, ow, ch)
+    } else {
+        (canvas, cw, ch)
+    };
     for (p, a) in image.data.iter_mut().zip(alpha.iter()) {
         if *a == 0 {
             *p = [0.0; 3];
         }
     }
     // ---------- mirror ----------
-    let mut alpha = alpha;
     if st.flip_h || st.flip_v {
         flip_in_place(&mut image.data, cw, ch, st.flip_h, st.flip_v);
         flip_in_place(&mut alpha, cw, ch, st.flip_h, st.flip_v);
@@ -545,6 +580,37 @@ pub fn render(
     };
     progress.set_fraction(1.0);
     Ok(RenderOutput { image, alpha, canvas, crop })
+}
+
+fn extend_canvas(c: &Canvas, m: usize) -> Canvas {
+    let w = c.w;
+    let nw = w + 2 * m;
+    let boxes = c
+        .boxes
+        .iter()
+        .map(|b| {
+            b.map(|(x0, y0, x1, y1)| {
+                let mut lo = usize::MAX;
+                let mut hi = 0usize;
+                for shift in [-(w as isize), 0, w as isize] {
+                    let a = x0 as isize + m as isize + shift;
+                    let b = x1 as isize + m as isize + shift;
+                    let a = a.clamp(0, nw as isize) as usize;
+                    let b = b.clamp(0, nw as isize) as usize;
+                    if b > a {
+                        lo = lo.min(a);
+                        hi = hi.max(b);
+                    }
+                }
+                if lo >= hi {
+                    (x0 + m, y0, x1 + m, y1)
+                } else {
+                    (lo, y0, hi, y1)
+                }
+            })
+        })
+        .collect();
+    Canvas { u0: c.u0 - m as f64 / c.scale, w: nw, boxes, wrap_u: true, ..c.clone() }
 }
 
 pub fn flip_in_place<T: Copy>(v: &mut [T], w: usize, h: usize, fh: bool, fv: bool) {

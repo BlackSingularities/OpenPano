@@ -9,7 +9,7 @@ use panoramer_core::stitch::align::{AlignSettings, FocalSource};
 use panoramer_core::stitch::geometry::{LensType, Projection};
 use panoramer_core::stitch::render::{self, RenderSettings};
 use panoramer_core::stitch::{Cancel, Progress, StitchError};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -317,6 +317,25 @@ pub struct AlignInfo {
     coverage: (f64, f64, f64),
     auto_projection: Projection,
     seconds: f64,
+    /// 0..100 alignment quality score
+    quality: f64,
+    /// "good" | "fair" | "poor"
+    quality_level: String,
+    /// problem codes: "unaligned", "highError", "weakPairs"
+    issues: Vec<String>,
+    /// image pairs with their inlier counts (ids)
+    pair_list: Vec<PairInfo>,
+    /// suggested image pair (ids) for manual control points
+    suggest: Option<(u32, u32)>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PairInfo {
+    a: u32,
+    b: u32,
+    points: usize,
+    confidence: f64,
 }
 
 fn align_info(al: &Aligned, ids: &[u32], secs: f64) -> AlignInfo {
@@ -341,7 +360,57 @@ fn align_info(al: &Aligned, ids: &[u32], secs: f64) -> AlignInfo {
         })
         .collect();
     let hfov = a.cameras.iter().flatten().next().map(|c| a.lens.hfov_from_focal(c.f, c.w as f64)).unwrap_or(0.0);
+    // ---- quality score
+    let total = a.cameras.len().max(1);
+    let aligned = a.cameras.iter().filter(|c| c.is_some()).count();
+    let frac = aligned as f64 / total as f64;
+    let rms_f = (1.0 - (a.rms_px - 1.5) / 6.0).clamp(0.25, 1.0);
+    let weak = a.pairs.iter().filter(|p| p.confidence < 1.3).count();
+    let tree_edges = aligned.saturating_sub(1).max(1);
+    let weak_f = if a.pairs.len() <= tree_edges && weak > 0 { 0.8 } else { 1.0 };
+    let quality = (100.0 * frac.powf(1.5) * rms_f * weak_f).round();
+    let mut issues = Vec::new();
+    if aligned < total {
+        issues.push("unaligned".to_string());
+    }
+    if a.rms_px > 4.0 {
+        issues.push("highError".to_string());
+    }
+    if weak_f < 1.0 {
+        issues.push("weakPairs".to_string());
+    }
+    let quality_level = if quality >= 80.0 && issues.is_empty() {
+        "good"
+    } else if quality >= 55.0 {
+        "fair"
+    } else {
+        "poor"
+    }
+    .to_string();
+    let pair_list: Vec<PairInfo> = a
+        .pairs
+        .iter()
+        .map(|p| PairInfo { a: ids[p.i], b: ids[p.j], points: p.pts.len(), confidence: p.confidence })
+        .collect();
+    // suggestion: first unaligned image with its neighbour in file order, else the weakest pair
+    let suggest = (0..a.cameras.len())
+        .find(|&k| a.cameras[k].is_none())
+        .map(|k| {
+            let nb = if k > 0 { k - 1 } else { (k + 1).min(a.cameras.len() - 1) };
+            (ids[nb], ids[k])
+        })
+        .or_else(|| {
+            a.pairs
+                .iter()
+                .min_by(|x, y| x.confidence.partial_cmp(&y.confidence).unwrap())
+                .map(|p| (ids[p.i], ids[p.j]))
+        });
     AlignInfo {
+        quality,
+        quality_level,
+        issues,
+        pair_list,
+        suggest,
         cameras,
         lens: a.lens,
         rms: a.rms_px,
@@ -360,15 +429,41 @@ fn align_info(al: &Aligned, ids: &[u32], secs: f64) -> AlignInfo {
     }
 }
 
+#[derive(Deserialize, Clone)]
+pub struct ManualDto {
+    a: u32,
+    b: u32,
+    ax: f64,
+    ay: f64,
+    bx: f64,
+    by: f64,
+}
+
 #[tauri::command]
-pub async fn align(app: AppHandle, state: State<'_, Shared>, ids: Vec<u32>, settings: AlignSettings, photo: PhotoOptions) -> Res<AlignInfo> {
+pub async fn align(
+    app: AppHandle,
+    state: State<'_, Shared>,
+    ids: Vec<u32>,
+    settings: AlignSettings,
+    photo: PhotoOptions,
+    manual: Option<Vec<ManualDto>>,
+) -> Res<AlignInfo> {
+    let manual: Vec<panoramer_core::stitch::align::ManualPoint> = manual
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|m| {
+            let i = ids.iter().position(|x| *x == m.a)?;
+            let j = ids.iter().position(|x| *x == m.b)?;
+            Some(panoramer_core::stitch::align::ManualPoint { i, j, a: [m.ax, m.ay], b: [m.bx, m.by] })
+        })
+        .collect();
     let works: Vec<Arc<WorkImage>> = {
         let g = state.inner.lock().unwrap();
         ids.iter().map(|id| g.works.get(id).cloned().ok_or_else(|| format!("image {id} not loaded"))).collect::<Res<_>>()?
     };
     let (progress, cancel, done) = begin_job(&app, &state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageFeatures));
     let t0 = std::time::Instant::now();
-    let r = tauri::async_runtime::spawn_blocking(move || project::run_align(&works, &settings, &photo, &progress, &cancel))
+    let r = tauri::async_runtime::spawn_blocking(move || project::run_align(&works, &settings, &photo, &manual, &progress, &cancel))
         .await
         .map_err(err)?;
     done.store(true, Ordering::Relaxed);
@@ -497,4 +592,33 @@ pub async fn render_and_save(app: AppHandle, state: State<'_, Shared>, path: Str
 pub fn any_raw(state: State<'_, Shared>, ids: Vec<u32>) -> bool {
     let g = state.inner.lock().unwrap();
     ids.iter().filter_map(|id| g.works.get(id)).any(|w| w.is_raw)
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkPreview {
+    data: String,
+    w: usize,
+    h: usize,
+    full_w: usize,
+    full_h: usize,
+}
+
+/// Working-resolution image (JPEG data URL) for the control point editor.
+#[tauri::command]
+pub fn work_preview(state: State<'_, Shared>, id: u32) -> Res<WorkPreview> {
+    let w = state.inner.lock().unwrap().works.get(&id).cloned().ok_or("image not loaded")?;
+    let conv = panoramer_core::imaging::ToSrgb8::new();
+    let rgb: Vec<u8> = w.img.data.iter().flat_map(|p| [conv.conv(p[0]), conv.conv(p[1]), conv.conv(p[2])]).collect();
+    let mut buf = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 88)
+        .encode(&rgb, w.img.w as u32, w.img.h as u32, image::ExtendedColorType::Rgb8)
+        .map_err(err)?;
+    Ok(WorkPreview {
+        data: format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&buf)),
+        w: w.img.w,
+        h: w.img.h,
+        full_w: w.full_w,
+        full_h: w.full_h,
+    })
 }

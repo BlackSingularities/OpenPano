@@ -90,6 +90,7 @@
       </button>
       {#if app.align}
         <div class="stats">
+          <div data-tip={t("h_statQuality")}><span>{t("statQuality")}</span><b class={app.align.qualityLevel === "good" ? "good" : app.align.qualityLevel === "fair" ? "mid" : "bad"}>{app.align.quality}/100</b></div>
           <div data-tip={t("h_statImages")}><span>{t("statImages")}</span><b>{alignedCount}/{app.align.cameras.length}</b></div>
           <div data-tip={t("h_statError")}><span>{t("statError")}</span><b class={rmsClass}>{app.align.rms.toFixed(2)} px</b></div>
           <div data-tip={t("h_statFov")}><span>{t("statFov")}</span><b>{app.align.hfov.toFixed(1)}° <em>({focalLabel})</em></b></div>

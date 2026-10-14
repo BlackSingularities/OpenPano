@@ -110,7 +110,21 @@ export interface CamInfo {
   h: number;
 }
 
+export interface ManualPoint {
+  a: number;
+  b: number;
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+}
+
 export interface AlignInfo {
+  quality: number;
+  qualityLevel: "good" | "fair" | "poor";
+  issues: string[];
+  pairList: { a: number; b: number; points: number; confidence: number }[];
+  suggest: [number, number] | null;
   cameras: CamInfo[];
   lens: LensType;
   rms: number;
@@ -162,7 +176,10 @@ export const app = $state({
   sphereBuilding: false,
   log: [] as LogEntry[],
   toasts: [] as Toast[],
-  dialogs: { about: false, shortcuts: false, log: false, exit: false },
+  dialogs: { about: false, shortcuts: false, log: false, exit: false, cp: false },
+  manualPoints: [] as ManualPoint[],
+  cpPair: null as [number, number] | null,
+  alignFailed: false,
   dragOver: false,
   exportedSnapshot: null as string | null,
   workVersion: 0,
@@ -371,6 +388,7 @@ export function reveal(path: string) {
 }
 
 export function invalidateAlignment() {
+  app.alignFailed = false;
   app.align = null;
   app.alignedIds = [];
   app.sphere = null;
@@ -397,14 +415,18 @@ export async function align() {
   const settings = { ...st.align, manual_hfov: st.manualFov ? st.fovDeg : null };
   app.job = { kind: "align", stage: "", fraction: 0, started: Date.now() };
   try {
-    const info = await invoke<AlignInfo>("align", { ids, settings, photo: st.photo });
+    const manual = app.manualPoints.filter((m) => ids.includes(m.a) && ids.includes(m.b));
+    const info = await invoke<AlignInfo>("align", { ids, settings, photo: st.photo, manual });
+    app.alignFailed = false;
+    app.cpPair = info.suggest;
     app.align = info;
     app.alignedIds = ids;
     app.workVersion++;
     const n = info.cameras.filter((c) => c.aligned).length;
     log(`${t("alignDone")}: ${n}/${ids.length} · RMS ${info.rms.toFixed(2)} px · ${info.seconds.toFixed(1)} s`);
-    if (n < ids.length) toast(t("warnUnaligned"), "error");
-    else toast(`${t("alignDone")}: ${n}/${ids.length} · RMS ${info.rms.toFixed(2)} px`, "ok");
+    if (info.qualityLevel !== "good") {
+      toast(`${t("qualityLow")} (${info.quality}/100)`, "error", { label: t("cpOpen"), run: () => (app.dialogs.cp = true) });
+    } else toast(`${t("alignDone")}: ${n}/${ids.length} · RMS ${info.rms.toFixed(2)} px · ${info.quality}/100`, "ok");
     const r = S.settings.render;
     Object.assign(r, { yaw: 0, pitch: 0, roll: 0, flip_h: false, flip_v: false });
     if (r.crop === "Manual") r.crop = "Auto";
@@ -415,7 +437,11 @@ export async function align() {
     app.job = null;
     const msg = String(e);
     log(`${t("alignFailed")}: ${msg}`, true);
-    toast(`${t("alignFailed")}: ${msg}`, "error");
+    if (!msg.toLowerCase().includes("anulowano") && !msg.toLowerCase().includes("cancel")) {
+      app.alignFailed = true;
+      app.cpPair = [ids[0], ids[1]];
+      toast(`${t("alignFailed")}: ${msg}`, "error", { label: t("cpOpen"), run: () => (app.dialogs.cp = true) });
+    }
   }
 }
 

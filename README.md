@@ -34,7 +34,10 @@ Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne
 - **Projekcja automatyczna** (domyślnie): program sam dobiera projekcję do zasięgu panoramy.
 - **Prostowanie horyzontu.**
 - **Korekcja fotometryczna:** wyrównanie ekspozycji, balansu kolorów i usuwanie winietowania.
-- **Mieszanie wielopasmowe** (piramidy Laplace'a) i wybór szwów. Opcjonalnie wtapianie liniowe lub ostre szwy.
+- **Mieszanie wielopasmowe** (piramidy Laplace'a) z **inteligentnymi szwami** (graph-cut). Szew omija poruszające się obiekty i paralaksę, więc nie ma „duchów”.
+- **Korekcja dystorsji obiektywu** (k1, k2) liczona automatycznie oraz odporne wyznaczanie kąta widzenia bez EXIF.
+- **Płynny szew 360°:** mieszanie przechodzi przez granicę ±180° bez widocznego łączenia.
+- **Ocena jakości dopasowania** (0–100). Gdy jest słaba albo któreś zdjęcie się nie połączy, program proponuje **ręczne punkty kontrolne** w edytorze par zdjęć.
 - **Kadrowanie** automatyczne (największy prostokąt bez pustych obszarów) lub ręczne.
 - **Metadane GPano** dla panoram 360°: Google Photos, Facebook i przeglądarki VR rozpoznają je automatycznie.
 - **Tryb wiersza poleceń** do pracy wsadowej.
