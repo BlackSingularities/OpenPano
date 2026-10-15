@@ -11,6 +11,7 @@ import type { LensType, Projection } from "./geometry";
 import { setLang, t, type Lang } from "./i18n.svelte";
 import type { SphereMeta } from "./gl";
 import { applyTheme, THEMES, type ThemeId } from "./theme";
+import { kindOf, wrap180, type Kind } from "./composition";
 
 export type CropMode = "Auto" | "None" | "Manual";
 export type Blend = "Multiband" | "Feather" | "Seams";
@@ -30,6 +31,11 @@ export interface RenderSettings {
   yaw: number;
   pitch: number;
   roll: number;
+  /** field of view of view-type projections, degrees (0 = auto) */
+  fov: number;
+  /** pitch/roll that level the horizon (UI only, see lib/composition.ts) */
+  level_pitch: number;
+  level_roll: number;
   circular_fisheye: boolean;
   bicubic: boolean;
   flip_h: boolean;
@@ -69,6 +75,9 @@ export const defaultRender = (): RenderSettings => ({
   yaw: 0,
   pitch: 0,
   roll: 0,
+  fov: 0,
+  level_pitch: 0,
+  level_roll: 0,
   circular_fisheye: false,
   bicubic: true,
   flip_h: false,
@@ -485,7 +494,7 @@ export async function align() {
     const lonely = lonelyManualPairs().filter(([a, b]) => ids.includes(a) && ids.includes(b));
     if (lonely.length) toast(`${t("cpLonely")}: ${lonely.map(([a, b]) => `${imageName(a)} ↔ ${imageName(b)}`).join(", ")}`, "info", openCp);
     const r = S.settings.render;
-    Object.assign(r, { yaw: 0, pitch: 0, roll: 0, flip_h: false, flip_v: false });
+    Object.assign(r, { yaw: 0, pitch: 0, roll: 0, level_pitch: 0, level_roll: 0, flip_h: false, flip_v: false });
     if (r.crop === "Manual") r.crop = "Auto";
     resetHistory();
     app.job = null;
@@ -648,7 +657,10 @@ export function cancelJob() {
 
 // ------------------------------------------------------------------------------ history
 
-type ViewState = Pick<RenderSettings, "auto_projection" | "projection" | "full_sphere" | "yaw" | "pitch" | "roll" | "flip_h" | "flip_v" | "crop" | "manual_crop">;
+type ViewState = Pick<
+  RenderSettings,
+  "auto_projection" | "projection" | "full_sphere" | "yaw" | "pitch" | "roll" | "fov" | "level_pitch" | "level_roll" | "flip_h" | "flip_v" | "crop" | "manual_crop"
+>;
 const H = $state({ stack: [] as string[], pos: -1 });
 
 function currentView(): string {
@@ -660,6 +672,9 @@ function currentView(): string {
     yaw: +r.yaw.toFixed(3),
     pitch: +r.pitch.toFixed(3),
     roll: +r.roll.toFixed(3),
+    fov: r.fov,
+    level_pitch: +r.level_pitch.toFixed(3),
+    level_roll: +r.level_roll.toFixed(3),
     flip_h: r.flip_h,
     flip_v: r.flip_v,
     crop: r.crop,
@@ -710,6 +725,7 @@ export function redo() {
 
 /** Called after any discrete change of view-related settings. */
 export function viewChanged() {
+  syncLevel();
   refreshLayout();
   persist();
   clearTimeout(histTimer);
@@ -738,11 +754,80 @@ export function fitView() {
 export function nudgeView(dyaw: number, dpitch: number, droll: number) {
   const r = S.settings.render;
   r.yaw = ((((r.yaw + dyaw + 180) % 360) + 360) % 360) - 180;
-  r.pitch = Math.max(-90, Math.min(90, r.pitch + dpitch));
+  // in strip panoramas tilting only bends the horizon – up/down does nothing there
+  if (currentKind() !== "strip") r.pitch = Math.max(-90, Math.min(90, r.pitch + dpitch));
   r.roll = ((((r.roll + droll + 180) % 360) + 360) % 360) - 180;
 }
 
 export function resetView() {
-  Object.assign(S.settings.render, { yaw: 0, pitch: 0, roll: 0, flip_h: false, flip_v: false });
+  Object.assign(S.settings.render, { yaw: 0, pitch: 0, roll: 0, level_pitch: 0, level_roll: 0, fov: 0, flip_h: false, flip_v: false });
+  viewChanged();
+}
+
+// --------------------------------------------------------------------------- composition
+
+export function currentKind(): Kind {
+  return kindOf(effectiveProjection());
+}
+
+/** In strip panoramas pitch/roll only ever level the horizon – remember them as the level. */
+function syncLevel() {
+  const r = S.settings.render;
+  if (currentKind() === "strip") {
+    r.level_pitch = r.pitch;
+    r.level_roll = r.roll;
+  }
+}
+
+/** Choose the projection (or "auto"); orientation is carried over in a way that fits the new type. */
+export function chooseProjection(p: Projection | "auto") {
+  const r = S.settings.render;
+  const before = currentKind();
+  if (p === "auto") r.auto_projection = true;
+  else {
+    r.auto_projection = false;
+    r.projection = p;
+  }
+  const after = currentKind();
+  if (before !== after) {
+    // drop look-up/down and frame rotation offsets: start from a level view in the same direction
+    r.pitch = r.level_pitch;
+    r.roll = r.level_roll;
+    r.fov = 0;
+  }
+  viewChanged();
+}
+
+/** Look offsets of view-type projections, relative to the level horizon. */
+export function lookOffsets(): { pitch: number; roll: number } {
+  const r = S.settings.render;
+  return { pitch: r.pitch - r.level_pitch, roll: wrap180(r.roll - r.level_roll) };
+}
+export function setLookOffsets(pitch: number | null, roll: number | null) {
+  const r = S.settings.render;
+  if (pitch != null) r.pitch = Math.max(-90, Math.min(90, r.level_pitch + pitch));
+  if (roll != null) r.roll = wrap180(r.level_roll + roll);
+}
+
+/** Apply a new total rotation produced by the horizon / vertical tools: it becomes the new level,
+ *  and view-type projections keep looking the same way relative to it. */
+export function applyLevel(yaw: number, pitch: number, roll: number) {
+  const r = S.settings.render;
+  const off = lookOffsets();
+  r.yaw = yaw;
+  r.pitch = pitch;
+  r.roll = roll;
+  if (currentKind() !== "strip") {
+    r.level_pitch = pitch - off.pitch;
+    r.level_roll = wrap180(roll - off.roll);
+  }
+  viewChanged();
+}
+
+/** Centre the panorama on a world direction: strips only turn (keeping the horizon level). */
+export function centreOn(yaw: number, pitch: number) {
+  const r = S.settings.render;
+  r.yaw = yaw;
+  if (currentKind() !== "strip") r.pitch = pitch;
   viewChanged();
 }

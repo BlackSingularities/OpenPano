@@ -50,6 +50,10 @@
     spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
     file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+    pStrip: '<rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M2 13c3-1.5 5-1.5 7 0s4 1.5 6 0 4-1.5 7 0" opacity=".6"/>',
+    pView: '<path d="M3 5h18l-3 14H6z"/><path d="M12 5v14M7.5 12h9" opacity=".5"/>',
+    pVertical: '<rect x="7" y="2" width="10" height="20" rx="1.5"/><path d="M12 6v12M9.5 9h5" opacity=".5"/>',
+    pPlanet: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21" opacity=".5"/>',
   };
 </script>
 

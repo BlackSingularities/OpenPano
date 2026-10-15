@@ -4,9 +4,10 @@
   import Slider from "./Slider.svelte";
   import Switch from "./Switch.svelte";
   import Field from "./Field.svelte";
-  import { t, projName, projDesc, lensName } from "../lib/i18n.svelte";
-  import { PROJECTIONS, type LensType, type Projection } from "../lib/geometry";
-  import { S, app, vw, align, busyBlocking, readyIds, persist, viewChanged, buildSphere, setPhotometric, renderAndSave, resolvedFormat, anyRaw, effectiveProjection, resetView, commitHistory, nudgeView } from "../lib/store.svelte";
+  import Composition from "./Composition.svelte";
+  import { t, lensName } from "../lib/i18n.svelte";
+  import type { LensType } from "../lib/geometry";
+  import { S, app, vw, align, busyBlocking, readyIds, persist, viewChanged, buildSphere, setPhotometric, renderAndSave, resolvedFormat, anyRaw, effectiveProjection, commitHistory } from "../lib/store.svelte";
 
   const s = $derived(S.settings);
   const r = $derived(S.settings.render);
@@ -26,15 +27,6 @@
   });
   const rmsClass = $derived(!app.align ? "" : app.align.rms < 2 ? "good" : app.align.rms < 5 ? "mid" : "bad");
   const alignedCount = $derived(app.align ? app.align.cameras.filter((c) => c.aligned).length : 0);
-
-  function setProjection(p: Projection | "auto") {
-    if (p === "auto") r.auto_projection = true;
-    else {
-      r.auto_projection = false;
-      r.projection = p;
-    }
-    viewChanged();
-  }
 
   const fmt = $derived(resolvedFormat());
   const outSize = $derived.by(() => {
@@ -85,6 +77,9 @@
       <Slider label={t("ransac")} tip={t("h_ransac")} bind:value={s.align.ransac_threshold_px} min={1} max={10} step={0.5} decimals={1} unit="px" oncommit={persist} />
       <Switch label={t("optimizeFocal")} tip={t("h_optimizeFocal")} bind:checked={s.align.optimize_focal} onchange={persist} />
       <Switch label={t("straighten")} tip={t("h_straighten")} bind:checked={s.align.straighten} onchange={persist} />
+      {#if s.align.lens !== "Rectilinear"}
+        <Switch label={t("circularFisheye")} tip={t("h_circularFisheye")} bind:checked={r.circular_fisheye} onchange={rebuild} />
+      {/if}
       <button data-tip={t("h_align")} class="btn blue lg wide" disabled={busyBlocking() || readyIds().length < 2} onclick={align}>
         <Icon name="align" size={17} />{app.align ? t("realign") : t("alignImages")}
       </button>
@@ -100,41 +95,7 @@
       {/if}
     </Section>
 
-    <Section title={t("secProjection")} tip={t("h_secProjection")} icon="sphere" badge={app.align ? projName(effectiveProjection()) : ""}>
-      <div class="projs">
-        <button class="pc auto" class:on={r.auto_projection} onclick={() => setProjection("auto")} data-tip={t("projAutoDesc")}>
-          <span class="pn"><Icon name="spark" size={14} />{t("projAuto")}</span>
-          <span class="pd">{app.align ? "→ " + projName(app.align.autoProjection) : t("projAutoDesc")}</span>
-        </button>
-        {#each PROJECTIONS as p}
-          <button class="pc" class:on={!r.auto_projection && r.projection === p} onclick={() => setProjection(p)} data-tip={projDesc(p)}>
-            <span class="pn">{projName(p)}</span>
-          </button>
-        {/each}
-      </div>
-      <p class="desc">{r.auto_projection ? t("projAutoDesc") : projDesc(r.projection)}</p>
-      <Switch label={t("fullSphere")} tip={t("h_fullSphere")} disabled={effectiveProjection() !== "Equirectangular"} bind:checked={r.full_sphere} onchange={viewChanged} />
-      <Switch label={t("circularFisheye")} tip={t("h_circularFisheye")} disabled={s.align.lens === "Rectilinear"} bind:checked={r.circular_fisheye} onchange={rebuild} />
-    </Section>
-
-    <Section title={t("secView")} tip={t("h_secView")} icon="compass">
-      <Slider label={t("yaw")} tip={t("h_yaw")} bind:value={r.yaw} min={-180} max={180} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
-      <Slider label={t("pitch")} tip={t("h_pitch")} bind:value={r.pitch} min={-90} max={90} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
-      <Slider label={t("roll")} tip={t("h_roll")} bind:value={r.roll} min={-180} max={180} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
-      <div class="btnrow">
-        <button class="btn sm" data-tip={t("rotL")} onclick={() => (nudgeView(0, 0, 90), viewChanged())}><Icon name="rotl" size={15} />90°</button>
-        <button class="btn sm" data-tip={t("rotR")} onclick={() => (nudgeView(0, 0, -90), viewChanged())}><Icon name="rotr" size={15} />90°</button>
-        <button class="btn sm" data-tip={t("rot180")} onclick={() => (nudgeView(0, 0, 180), viewChanged())}>180°</button>
-        <button class="btn sm icon" class:active={r.flip_h} data-tip={t("flipH")} onclick={() => ((r.flip_h = !r.flip_h), viewChanged())}><Icon name="flipH" size={15} /></button>
-        <button class="btn sm icon" class:active={r.flip_v} data-tip={t("flipV")} onclick={() => ((r.flip_v = !r.flip_v), viewChanged())}><Icon name="flipV" size={15} /></button>
-      </div>
-      <div class="btnrow">
-        <button class="btn sm" class:active={vw.tool === "center"} data-tip={t("toolCenterHint")} onclick={() => (vw.tool = "center")}><Icon name="target" size={15} />{t("toolCenter")}</button>
-        <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} onclick={() => (vw.tool = "horizon")}><Icon name="horizon" size={15} />{t("toolHorizon")}</button>
-        <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} onclick={() => (vw.tool = "vertical")}><Icon name="vertical" size={15} />{t("toolVertical")}</button>
-      </div>
-      <button class="btn sm ghost" data-tip={t("h_resetView")} onclick={resetView}><Icon name="reset" size={15} />{t("resetView")}</button>
-    </Section>
+    <Composition />
 
     <Section title={t("secBlend")} tip={t("h_secBlend")} icon="layers" open={false}>
       <Field label={t("blend")} tip={t("h_blend")}>
@@ -290,67 +251,5 @@
   }
   .bad {
     color: var(--err);
-  }
-  .projs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-  }
-  .pc {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-    padding: 7px 9px;
-    border-radius: 12px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    cursor: pointer;
-    text-align: left;
-    min-width: 0;
-  }
-  .pc:hover {
-    border-color: var(--line-2);
-    background: var(--raised);
-  }
-  .pc.on {
-    border-color: var(--sel-bg);
-    background: var(--sel-bg);
-    color: var(--sel-fg);
-  }
-  .pc.on .pd {
-    color: var(--sel-fg);
-    opacity: 0.65;
-  }
-  .pc.auto {
-    grid-column: 1 / -1;
-  }
-  .pn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-  .pc.auto .pn :global(svg) {
-    color: var(--accent);
-  }
-  .pd {
-    font-size: 11px;
-    color: var(--text-3);
-  }
-  .desc {
-    margin: 0;
-    font-size: 11.5px;
-    color: var(--text-3);
-  }
-  .btnrow {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
   }
 </style>

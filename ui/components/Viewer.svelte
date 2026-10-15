@@ -6,7 +6,7 @@
   import { wraps, forward, inverse, lensRay, level, largestRect, mul, solveGrab, transpose, ypr, yawPitchTowards, type V3 } from "../lib/geometry";
   import { t } from "../lib/i18n.svelte";
   import { canvasBg } from "../lib/theme";
-  import { themeState, S, app, vw, fitView, viewChanged, commitHistory, undo, redo, canUndo, canRedo, persist, type Tool } from "../lib/store.svelte";
+  import { themeState, S, app, vw, fitView, viewChanged, commitHistory, undo, redo, canUndo, canRedo, persist, centreOn, applyLevel, currentKind, lookOffsets, type Tool } from "../lib/store.svelte";
 
   let host: HTMLDivElement;
   let canvas: HTMLCanvasElement;
@@ -422,9 +422,7 @@
       const d = screenToWorld(p.x, p.y);
       if (d) {
         const [y, pt] = yawPitchTowards(d);
-        r.yaw = y;
-        r.pitch = pt;
-        viewChanged();
+        centreOn(y, pt);
       }
     } else if (tool === "horizon" || tool === "vertical") {
       const d = screenToWorld(p.x, p.y);
@@ -435,10 +433,7 @@
         const res = level(r, points[0], points[1], tool === "horizon");
         points = [];
         vw.points = 0;
-        if (res) {
-          [r.yaw, r.pitch, r.roll] = res;
-          viewChanged();
-        }
+        if (res) applyLevel(...res);
       }
     }
   }
@@ -481,6 +476,15 @@
       default:
         return "crosshair";
     }
+  });
+
+  // live readout while dragging, named like the controls of the current panorama type
+  const hud = $derived.by(() => {
+    const f = (v: number) => `<b>${v.toFixed(1)}°</b>`;
+    const kind = currentKind();
+    if (kind === "strip") return `${t("cHudCentre")} ${f(r.yaw)} · ${t("cHudTilt")} ${f(r.pitch)} · ${t("cHudSlant")} ${f(r.roll)}`;
+    const o = lookOffsets();
+    return `${t("cHudLook")} ${f(r.yaw)} / ${f(o.pitch)} · ${t("cHudRot")} ${f(o.roll)}`;
   });
 
   const hoverInfo = $derived.by(() => {
@@ -547,11 +551,6 @@
     { id: "vertical", icon: "vertical", label: () => t("toolVertical"), hint: () => t("toolVerticalHint"), key: "V" },
     { id: "crop", icon: "crop", label: () => t("toolCrop"), hint: () => t("toolCropHint"), key: "K" },
   ];
-
-  function rot(d: number) {
-    r.roll = ((((r.roll + d + 180) % 360) + 360) % 360) - 180;
-    viewChanged();
-  }
 </script>
 
 <div class="viewer">
@@ -564,12 +563,6 @@
         </button>
       {/each}
     </div>
-    <div class="sep"></div>
-    <button class="btn ghost icon" data-tip={t("rotL")} onclick={() => rot(90)}><Icon name="rotl" size={17} /></button>
-    <button class="btn ghost icon" data-tip={t("rotR")} onclick={() => rot(-90)}><Icon name="rotr" size={17} /></button>
-    <button class="btn ghost sm" data-tip={t("rot180")} onclick={() => rot(180)}>180°</button>
-    <button class="btn ghost icon" class:active={r.flip_h} data-tip={t("flipH")} onclick={() => ((r.flip_h = !r.flip_h), viewChanged())}><Icon name="flipH" size={17} /></button>
-    <button class="btn ghost icon" class:active={r.flip_v} data-tip={t("flipV")} onclick={() => ((r.flip_v = !r.flip_v), viewChanged())}><Icon name="flipV" size={17} /></button>
     <div class="sep"></div>
     <button class="btn ghost icon" data-tip="{t('undo')} (Ctrl+Z)" disabled={!canUndo()} onclick={undo}><Icon name="undo" size={17} /></button>
     <button class="btn ghost icon" data-tip="{t('redo')} (Ctrl+Y)" disabled={!canRedo()} onclick={redo}><Icon name="redo" size={17} /></button>
@@ -657,9 +650,7 @@
     {/if}
 
     {#if vw.interacting}
-      <div class="hud-top">
-        yaw <b>{r.yaw.toFixed(1)}°</b> · pitch <b>{r.pitch.toFixed(1)}°</b> · roll <b>{r.roll.toFixed(1)}°</b>
-      </div>
+      <div class="hud-top">{@html hud}</div>
     {/if}
 
     <div class="hud-bl">
@@ -863,7 +854,7 @@
     color: var(--text-2);
     pointer-events: none;
   }
-  .hud-top b {
+  .hud-top :global(b) {
     color: var(--text);
   }
   .hud-bl,

@@ -152,6 +152,40 @@ impl Projection {
         matches!(self, Projection::Equirectangular | Projection::Cylindrical | Projection::Mercator | Projection::Sinusoidal)
     }
 
+    /// Projections that look in one direction (with a field of view) rather than unrolling a strip.
+    pub fn is_view(self) -> bool {
+        matches!(
+            self,
+            Projection::Rectilinear | Projection::Panini | Projection::Fisheye | Projection::Stereographic | Projection::LittlePlanet | Projection::Orthographic
+        )
+    }
+
+    /// Default field of view (degrees) when none is set; 0 = only the projection limits apply.
+    pub fn auto_fov(self) -> f64 {
+        match self {
+            // wider rectilinear views stretch the edges beyond use
+            Projection::Rectilinear => 130.0,
+            _ => 0.0,
+        }
+    }
+
+    /// Plane coordinate of a direction `a` radians away from the projection centre.
+    pub fn half_extent(self, a: f64) -> f64 {
+        let a = a.max(1e-3);
+        match self {
+            Projection::Rectilinear => a.min(1.5).tan(),
+            Projection::Panini => {
+                let a = a.min(PI * 0.96);
+                let s = 2.0 / (1.0 + a.cos());
+                s * a.sin()
+            }
+            Projection::Fisheye => a.min(PI),
+            Projection::Stereographic | Projection::LittlePlanet => 2.0 * (a.min(PI * 0.94) / 2.0).tan(),
+            Projection::Orthographic => a.min(FRAC_PI_2).sin(),
+            _ => f64::MAX,
+        }
+    }
+
     /// Hard limits of the plane coordinates (u_min, u_max, v_min, v_max) for this projection.
     pub fn limits(self) -> (f64, f64, f64, f64) {
         match self {

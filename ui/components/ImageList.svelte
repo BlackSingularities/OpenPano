@@ -2,7 +2,7 @@
   import Icon from "./Icon.svelte";
   import { t } from "../lib/i18n.svelte";
   import { yawPitchTowards, mul } from "../lib/geometry";
-  import { S, app, pickFiles, pickFolder, removeImage, toggleImage, setAllEnabled, sortImages, clearImages, reveal, busyBlocking, viewChanged } from "../lib/store.svelte";
+  import { S, app, pickFiles, pickFolder, removeImage, toggleImage, setAllEnabled, sortImages, clearImages, reveal, busyBlocking, centreOn } from "../lib/store.svelte";
 
   let menu = $state<{ id: number; x: number; y: number } | null>(null);
 
@@ -17,9 +17,7 @@
     const c = camOf(id);
     if (!c || !c.cam.aligned) return;
     const [y, p] = yawPitchTowards(mul(c.cam.rot, [0, 0, 1]));
-    S.settings.render.yaw = y;
-    S.settings.render.pitch = p;
-    viewChanged();
+    centreOn(y, p);
   }
 
   function openMenu(e: MouseEvent, id: number) {

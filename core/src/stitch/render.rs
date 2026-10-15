@@ -45,7 +45,9 @@ pub struct RenderSettings {
     pub yaw: f64,
     pub pitch: f64,
     pub roll: f64,
-    /// Field of view override for zoomable projections (degrees, 0 = auto).
+    /// Field of view of view-type projections (rectilinear, fisheye, little planet…), degrees;
+    /// 0 = automatic (fit the images).
+    pub fov: f64,
     pub circular_fisheye: bool,
     pub bicubic: bool,
     /// Mirror the result horizontally / vertically.
@@ -70,6 +72,7 @@ impl Default for RenderSettings {
             yaw: 0.0,
             pitch: 0.0,
             roll: 0.0,
+            fov: 0.0,
             circular_fisheye: false,
             bicubic: true,
             flip_h: false,
@@ -262,6 +265,18 @@ pub fn layout(al: &Alignment, st: &RenderSettings, px_scale: Option<f64>) -> Res
     }
     if u0 >= u1 || v0 >= v1 {
         return Err(StitchError::EmptyCanvas);
+    }
+    // view-type projections show a window of the given angular size around their centre
+    let fov = if st.fov > 0.0 { st.fov } else { proj.auto_fov() };
+    if fov > 0.0 && proj.is_view() {
+        let e = proj.half_extent((fov / 2.0).to_radians());
+        let (a0, a1, b0, b1) = (u0.max(-e), u1.min(e), v0.max(-e), v1.min(e));
+        if a1 > a0 && b1 > b0 {
+            (u0, u1, v0, v1) = (a0, a1, b0, b1);
+            for b in img_bounds.iter_mut().flatten() {
+                *b = (b.0.max(u0), b.1.min(u1), b.2.max(v0), b.3.min(v1));
+            }
+        }
     }
     if st.full_sphere && proj == Projection::Equirectangular {
         u0 = -PI;

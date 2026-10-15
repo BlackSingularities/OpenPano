@@ -60,6 +60,7 @@ OPTIONS:
         --no-distortion        Do not estimate lens distortion
         --no-smart-seams       Plain distance seams instead of ghost-aware graph cut
         --yaw/--pitch/--roll <DEG>  View rotation
+        --fov <DEG>            Field of view of view-type projections (0 = auto)
         --lang <pl|en>         Message language
     -h, --help                 Show this help
         --version              Show version";
@@ -185,6 +186,7 @@ OPTIONS:
                 "--yaw" => rs.yaw = num!(a),
                 "--pitch" => rs.pitch = num!(a),
                 "--roll" => rs.roll = num!(a),
+                "--fov" => rs.fov = num!(a),
                 "--lang" => {
                     if let Some(l) = Lang::from_code(&val!(a)) {
                         i18n::set_lang(l);

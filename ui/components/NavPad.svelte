@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
   import { t } from "../lib/i18n.svelte";
-  import { vw, nudgeView, resetView, fitView } from "../lib/store.svelte";
+  import { vw, nudgeView, resetView, fitView, currentKind } from "../lib/store.svelte";
 
   let { onstart, onend }: { onstart: () => void; onend: () => void } = $props();
 
@@ -67,6 +67,7 @@
       {#if b.d}
         <button
           class="nb"
+          disabled={b.d[1] !== 0 && currentKind() === "strip"}
           class:on={active === b.id}
           data-tip={b.tip()}
           onpointerdown={(e) => down(e, b.id, b.d[0], b.d[1], b.d[2])}

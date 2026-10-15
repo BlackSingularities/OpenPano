@@ -160,6 +160,7 @@ pub fn build_sphere(
     srs.yaw = 0.0;
     srs.pitch = 0.0;
     srs.roll = 0.0;
+    srs.fov = 0.0;
     srs.flip_h = false;
     srs.flip_v = false;
     srs.crop = render::CropMode::None;
