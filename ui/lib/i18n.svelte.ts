@@ -257,6 +257,7 @@ const D = {
   qualityLow: ["Słaba jakość dopasowania", "Low alignment quality"],
   qPoor: ["słaba", "poor"],
   qFair: ["przeciętna", "fair"],
+  qGood: ["dobra", "good"],
   qFailed: ["Automatyczne dopasowanie nie połączyło zdjęć", "Automatic alignment could not connect the images"],
   qUnaligned: ["zdjęcie niepołączone", "image not connected"],
   qHighError: ["duży błąd", "high error"],
@@ -274,6 +275,30 @@ const D = {
   cpRemove: ["Usuń punkt", "Remove point"],
   cpSwap: ["Zamień zdjęcia", "Swap images"],
   cpApply: ["Dopasuj z punktami", "Align with points"],
+  andMore: ["i {n} innych", "and {n} more"],
+  qNotConnected: ["niepołączone", "not connected"],
+  qNoPairs: ["Żadna para zdjęć nie ma wystarczająco wielu zgodnych punktów", "No image pair has enough consistent points"],
+  qBestPair: ["najwięcej kandydatów", "most candidates"],
+  qMatchesOf: ["dopasowań, zgodnych", "matches, consistent"],
+  qBadPairs: ["pary niezgodne z resztą panoramy (paralaksa lub błędne dopasowania)", "pairs disagree with the rest of the panorama (parallax or wrong matches)"],
+  cpLonely: ["Pojedynczy punkt kontrolny nie wystarczy – dodaj co najmniej 2 dla pary", "A single control point is not enough – add at least 2 per pair"],
+  cpPairs: ["Pary do poprawy", "Pairs to fix"],
+  cpAllPairs: ["Wszystkie pary", "All pairs"],
+  cpStatus_ok: ["dopasowana", "matched"],
+  cpStatus_highError: ["niezgodna", "inconsistent"],
+  cpStatus_rejected: ["odrzucona", "rejected"],
+  cpStatus_weak: ["brak wspólnych punktów", "no common points"],
+  cpStatus_none: ["nie porównywano", "not compared"],
+  cpShowAuto: ["Automatyczne punkty", "Automatic points"],
+  cpShowAutoHint: ["Zielone – zgodne z panoramą, czerwone – błędne dopasowania (odrzucone lub niezgodne). Wskaż własne punkty tam, gdzie brakuje zielonych.", "Green – consistent with the panorama, red – wrong matches (rejected or inconsistent). Add your own points where green ones are missing."],
+  cpLegendGood: ["zgodne", "consistent"],
+  cpLegendBad: ["błędne", "wrong"],
+  cpPredicted: ["przewidywane miejsce", "predicted position"],
+  cpBadPoint: ["Ten punkt nie zgadza się z dopasowaniem – sprawdź, czy kliknięto ten sam szczegół", "This point disagrees with the alignment – check that the same detail was clicked"],
+  cpNeed2: ["min. 2 punkty na parę", "at least 2 points per pair"],
+  cpLoupe: ["Lupa", "Loupe"],
+  cpLoupeHint: ["Powiększenie pod kursorem do precyzyjnego wskazania punktu. Na ekranie dotykowym przytrzymaj palec, przesuń i puść.", "Magnifier under the cursor for precise placement. On touch screens press and hold, move, then release."],
+  cpErr: ["błąd", "error"],
   tabPreview: ["Podgląd", "Preview"],
   tabSettings: ["Ustawienia", "Settings"],
   stageLoading: ["Wczytywanie zdjęć", "Loading images"],
@@ -302,6 +327,14 @@ export function getLang(): Lang {
 }
 export function t(k: TKey): string {
   return D[k][L.lang === "pl" ? 0 : 1];
+}
+
+/** "n punkt/punkty/punktów" – Polish plural forms; English uses one/other. */
+export function countPoints(n: number): string {
+  if (L.lang !== "pl") return `${n} ${n === 1 ? "point" : "points"}`;
+  const d = n % 10, h = n % 100;
+  const w = n === 1 ? "punkt" : d >= 2 && d <= 4 && (h < 12 || h > 14) ? "punkty" : "punktów";
+  return `${n} ${w}`;
 }
 
 const PROJ: Record<Projection, [string, string, string, string]> = {

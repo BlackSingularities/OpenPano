@@ -107,6 +107,22 @@ pub struct PairMatch {
     pub confidence: f64,
 }
 
+/// Diagnostics for one tested image pair, kept even when the pair (or the whole alignment) is
+/// rejected, so the UI can show where matching went wrong.
+#[derive(Clone, Debug)]
+pub struct PairDiag {
+    pub i: usize,
+    pub j: usize,
+    /// descriptor matches before geometric verification
+    pub matches: usize,
+    /// matches consistent with a pure rotation (0 when RANSAC failed)
+    pub inliers: usize,
+    /// whether the pair passed verification and was used
+    pub accepted: bool,
+    /// sample of raw matches (centred full-resolution coordinates) with their RANSAC verdict
+    pub pts: Vec<([f64; 2], [f64; 2], bool)>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Alignment {
     pub cameras: Vec<Option<Camera>>,
@@ -114,6 +130,7 @@ pub struct Alignment {
     pub pairs: Vec<PairMatch>,
     pub rms_px: f64,
     pub focal_source: FocalSource,
+    pub diag: Vec<PairDiag>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -149,6 +166,18 @@ pub struct ManualPoint {
 const MANUAL_WEIGHT: usize = 5;
 
 pub fn align(imgs: &[AlignImage], st: &AlignSettings, manual: &[ManualPoint], progress: &Progress, cancel: &Cancel) -> Result<Alignment, StitchError> {
+    align_with_diag(imgs, st, manual, progress, cancel, &mut Vec::new())
+}
+
+/// Like [`align`], but also fills `diag` with per-pair matching diagnostics – also on failure.
+pub fn align_with_diag(
+    imgs: &[AlignImage],
+    st: &AlignSettings,
+    manual: &[ManualPoint],
+    progress: &Progress,
+    cancel: &Cancel,
+    diag: &mut Vec<PairDiag>,
+) -> Result<Alignment, StitchError> {
     let n = imgs.len();
     if n < 2 {
         return Err(StitchError::NotEnoughImages);
@@ -277,27 +306,42 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, manual: &[ManualPoint], pr
     progress.set_fraction(0.4);
 
     // ---------- robust rotation estimation per pair ----------
-    let mut pairs: Vec<PairMatch> = raw
+    let verified: Vec<(Option<PairMatch>, PairDiag)> = raw
         .par_iter()
-        .filter_map(|(i, j, pts)| {
+        .map(|(i, j, pts)| {
             let thr = st.ransac_threshold_px / imgs[*i].scale.min(imgs[*j].scale);
             let (fi, fj) = (focal[*i], focal[*j]);
             let ang_thr = thr / fi.min(fj);
             let rays: Vec<(V3, V3)> = pts.iter().map(|(a, b)| (st.lens.ray(a[0], a[1], fi), st.lens.ray(b[0], b[1], fj))).collect();
-            let (_r, inl) = ransac_rotation(&rays, ang_thr, 800)?;
+            let inl = ransac_rotation(&rays, ang_thr, 800).map(|(_, v)| v).unwrap_or_default();
             let need = (8.0 + 0.3 * pts.len() as f64).max(15.0);
             if std::env::var_os("PANORAMER_DEBUG").is_some() {
                 eprintln!("pair {}-{}: matches {} inliers {} need {:.0} f {:.0}", i, j, pts.len(), inl.len(), need, fi);
             }
-            if (inl.len() as f64) < need {
-                return None;
+            let accepted = inl.len() as f64 >= need;
+            let mut flag = vec![false; pts.len()];
+            inl.iter().for_each(|&k| flag[k] = true);
+            let mut sample: Vec<([f64; 2], [f64; 2], bool)> = pts.iter().zip(&flag).map(|(p, &f)| (p.0, p.1, f)).collect();
+            if sample.len() > 250 {
+                let step = sample.len() as f64 / 250.0;
+                sample = (0..250).map(|k| sample[(k as f64 * step) as usize]).collect();
+            }
+            let d = PairDiag { i: *i, j: *j, matches: pts.len(), inliers: inl.len(), accepted, pts: sample };
+            if !accepted {
+                return (None, d);
             }
             let conf = inl.len() as f64 / (8.0 + 0.3 * pts.len() as f64);
             let mut sel: Vec<([f64; 2], [f64; 2])> = inl.iter().map(|&k| pts[k]).collect();
             subsample_spread(&mut sel, 150);
-            Some(PairMatch { i: *i, j: *j, pts: sel, confidence: conf })
+            (Some(PairMatch { i: *i, j: *j, pts: sel, confidence: conf }), d)
         })
         .collect();
+    diag.clear();
+    let mut pairs: Vec<PairMatch> = Vec::new();
+    for (p, d) in verified {
+        pairs.extend(p);
+        diag.push(d);
+    }
     cancel.check()?;
     progress.set_fraction(0.5);
     // ---------- manual control points ----------
@@ -430,7 +474,7 @@ pub fn align(imgs: &[AlignImage], st: &AlignSettings, manual: &[ManualPoint], pr
     }
     center_yaw(&mut cameras);
     progress.set_fraction(1.0);
-    Ok(Alignment { cameras, lens: st.lens, pairs, rms_px: rms, focal_source: source })
+    Ok(Alignment { cameras, lens: st.lens, pairs, rms_px: rms, focal_source: source, diag: diag.clone() })
 }
 
 /// Returns the horizontal field of view (degrees) maximising rotation-model inliers.

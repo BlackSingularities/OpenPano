@@ -5,7 +5,7 @@ use panoramer_core::i18n::{self, Lang};
 use panoramer_core::output::OutputSettings;
 use panoramer_core::preview::Sphere;
 use panoramer_core::project::{self, Aligned, PhotoOptions, WorkImage};
-use panoramer_core::stitch::align::{AlignSettings, FocalSource};
+use panoramer_core::stitch::align::{AlignSettings, Camera, FocalSource, PairDiag};
 use panoramer_core::stitch::geometry::{LensType, Projection};
 use panoramer_core::stitch::render::{self, RenderSettings};
 use panoramer_core::stitch::{Cancel, Progress, StitchError};
@@ -24,6 +24,18 @@ pub struct Inner {
     aligned: Option<Arc<Aligned>>,
     aligned_ids: Vec<u32>,
     sphere: Option<Arc<Sphere>>,
+    /// matching diagnostics of the last alignment attempt (also when it failed)
+    diag: Option<Arc<DiagState>>,
+}
+
+pub struct DiagState {
+    ids: Vec<u32>,
+    pairs: Vec<PairDiag>,
+    /// final cameras by index (all None when alignment failed)
+    cameras: Vec<Option<Camera>>,
+    lens: LensType,
+    /// full-resolution sizes by index
+    sizes: Vec<(usize, usize)>,
 }
 
 #[derive(Default)]
@@ -463,10 +475,21 @@ pub async fn align(
     };
     let (progress, cancel, done) = begin_job(&app, &state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageFeatures));
     let t0 = std::time::Instant::now();
-    let r = tauri::async_runtime::spawn_blocking(move || project::run_align(&works, &settings, &photo, &manual, &progress, &cancel))
-        .await
-        .map_err(err)?;
+    let sizes: Vec<(usize, usize)> = works.iter().map(|w| (w.full_w, w.full_h)).collect();
+    let settings_lens = settings.lens;
+    let (r, pairs) = tauri::async_runtime::spawn_blocking(move || {
+        let mut diag = Vec::new();
+        let r = project::run_align_diag(&works, &settings, &photo, &manual, &progress, &cancel, &mut diag);
+        (r, diag)
+    })
+    .await
+    .map_err(err)?;
     done.store(true, Ordering::Relaxed);
+    let (cameras, lens) = match &r {
+        Ok(al) => (al.alignment.cameras.clone(), al.alignment.lens),
+        Err(_) => (vec![None; ids.len()], settings_lens),
+    };
+    state.inner.lock().unwrap().diag = Some(Arc::new(DiagState { ids: ids.clone(), pairs, cameras, lens, sizes }));
     let al = Arc::new(r.map_err(err)?);
     let info = align_info(&al, &ids, t0.elapsed().as_secs_f64());
     let mut g = state.inner.lock().unwrap();
@@ -474,6 +497,196 @@ pub async fn align(
     g.aligned_ids = ids;
     g.sphere = None;
     Ok(info)
+}
+
+// ------------------------------------------------------------------------- match diagnostics
+
+/// Reprojection error (full-resolution px) above which a pair counts as inconsistent.
+const PAIR_ERR_PX: f64 = 4.0;
+
+impl DiagState {
+    fn idx(&self, id: u32) -> Option<usize> {
+        self.ids.iter().position(|x| *x == id)
+    }
+    fn center(&self, k: usize) -> (f64, f64) {
+        ((self.sizes[k].0 as f64 - 1.0) / 2.0, (self.sizes[k].1 as f64 - 1.0) / 2.0)
+    }
+    /// Error in px (on image i) of a correspondence given in top-left full-res coordinates.
+    fn residual(&self, i: usize, j: usize, a: [f64; 2], b: [f64; 2]) -> Option<f64> {
+        let (ci, cj) = (self.cameras[i].as_ref()?, self.cameras[j].as_ref()?);
+        let ra = ci.ray_world(self.lens, a[0], a[1]).normalize();
+        let rb = cj.ray_world(self.lens, b[0], b[1]).normalize();
+        Some(ra.dot(&rb).clamp(-1.0, 1.0).acos() * ci.f)
+    }
+    /// Sampled raw matches as (top-left a, top-left b, inlier), flipped to (j, i) when asked.
+    fn pts(&self, d: &PairDiag, flip: bool) -> Vec<([f64; 2], [f64; 2], bool)> {
+        let (ci, cj) = (self.center(d.i), self.center(d.j));
+        d.pts
+            .iter()
+            .map(|(a, b, f)| {
+                let pa = [a[0] + ci.0, a[1] + ci.1];
+                let pb = [b[0] + cj.0, b[1] + cj.1];
+                if flip { (pb, pa, *f) } else { (pa, pb, *f) }
+            })
+            .collect()
+    }
+    /// Median error of the verified matches of a pair under the final cameras.
+    fn pair_error(&self, d: &PairDiag) -> Option<f64> {
+        let mut e: Vec<f64> = self.pts(d, false).iter().filter(|p| p.2).filter_map(|p| self.residual(d.i, d.j, p.0, p.1)).collect();
+        if e.is_empty() {
+            return None;
+        }
+        e.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        Some(e[e.len() / 2])
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairReport {
+    a: u32,
+    b: u32,
+    matches: usize,
+    inliers: usize,
+    accepted: bool,
+    /// median reprojection error of the pair (px) when both images are aligned
+    error: Option<f64>,
+    /// "ok" | "highError" | "rejected" | "weak"
+    status: &'static str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchReport {
+    failed: bool,
+    unaligned: Vec<u32>,
+    pairs: Vec<PairReport>,
+    suggest: Option<(u32, u32)>,
+}
+
+/// Which pairs matched, which were rejected or disagree with the final solution, and the most
+/// useful pair for manual control points.
+#[tauri::command]
+pub fn match_report(state: State<'_, Shared>) -> Res<MatchReport> {
+    let d = state.inner.lock().unwrap().diag.clone().ok_or("no alignment yet")?;
+    let n = d.ids.len();
+    let failed = d.cameras.iter().all(|c| c.is_none());
+    let unaligned_idx: Vec<usize> = (0..n).filter(|&k| d.cameras[k].is_none()).collect();
+    let mut pairs: Vec<PairReport> = d
+        .pairs
+        .iter()
+        .map(|p| {
+            let error = if p.accepted { d.pair_error(p) } else { None };
+            let status = if !p.accepted {
+                // a real overlap leaves a sizeable consistent subset; non-overlapping pairs only
+                // produce random matches with (almost) no consistent ones
+                if p.inliers >= 12 {
+                    "rejected"
+                } else {
+                    "weak"
+                }
+            } else if error.map(|e| e > PAIR_ERR_PX).unwrap_or(false) {
+                "highError"
+            } else {
+                "ok"
+            };
+            PairReport { a: d.ids[p.i], b: d.ids[p.j], matches: p.matches, inliers: p.inliers, accepted: p.accepted, error, status }
+        })
+        .collect();
+    let rank = |s: &str| match s {
+        "highError" => 0,
+        "rejected" => 1,
+        "ok" => 2,
+        _ => 3,
+    };
+    pairs.sort_by(|x, y| rank(x.status).cmp(&rank(y.status)).then(y.matches.cmp(&x.matches)));
+    let between = |i: usize, j: usize| d.pairs.iter().find(|p| (p.i == i && p.j == j) || (p.i == j && p.j == i)).map(|p| (p.inliers, p.matches)).unwrap_or((0, 0));
+    let suggest = if failed {
+        // the pair with the most candidate matches is the easiest one to fix by hand
+        d.pairs.iter().max_by_key(|p| (p.inliers, p.matches)).map(|p| (d.ids[p.i], d.ids[p.j])).or_else(|| (n >= 2).then(|| (d.ids[0], d.ids[1])))
+    } else if !unaligned_idx.is_empty() {
+        // the unaligned image with the strongest link to the aligned set, with that partner
+        let aligned: Vec<usize> = (0..n).filter(|k| d.cameras[*k].is_some()).collect();
+        unaligned_idx
+            .iter()
+            .flat_map(|&u| aligned.iter().map(move |&a| (a, u)))
+            .max_by_key(|&(a, u)| (between(a, u), usize::MAX - a.abs_diff(u)))
+            .map(|(a, u)| (d.ids[a], d.ids[u]))
+    } else {
+        pairs
+            .iter()
+            .find(|p| p.status == "highError")
+            .map(|p| (p.a, p.b))
+            .or_else(|| pairs.iter().filter(|p| p.accepted).min_by_key(|p| p.inliers).map(|p| (p.a, p.b)))
+    };
+    Ok(MatchReport { failed, unaligned: unaligned_idx.iter().map(|&k| d.ids[k]).collect(), pairs, suggest })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchPt {
+    ax: f64,
+    ay: f64,
+    bx: f64,
+    by: f64,
+    /// passed geometric verification for this pair
+    inlier: bool,
+    /// reprojection error under the final cameras (px)
+    error: Option<f64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairMatches {
+    tested: bool,
+    accepted: bool,
+    /// both images have a solved camera (errors and predictions are available)
+    solved: bool,
+    auto: Vec<MatchPt>,
+    /// error of each given manual point (px)
+    manual: Vec<Option<f64>>,
+}
+
+/// Automatic matches of an image pair (top-left full-res coordinates, oriented a→b) with their
+/// verdicts, plus the residual error of the user's control points for that pair.
+#[tauri::command]
+pub fn pair_matches(state: State<'_, Shared>, a: u32, b: u32, manual: Vec<ManualDto>) -> Res<PairMatches> {
+    let d = state.inner.lock().unwrap().diag.clone().ok_or("no alignment yet")?;
+    let (Some(i), Some(j)) = (d.idx(a), d.idx(b)) else {
+        return Ok(PairMatches { tested: false, accepted: false, solved: false, auto: vec![], manual: manual.iter().map(|_| None).collect() });
+    };
+    let solved = d.cameras[i].is_some() && d.cameras[j].is_some();
+    let pd = d.pairs.iter().find(|p| (p.i == i && p.j == j) || (p.i == j && p.j == i));
+    let auto = pd
+        .map(|p| {
+            d.pts(p, p.i != i)
+                .into_iter()
+                .map(|(pa, pb, inlier)| MatchPt { ax: pa[0], ay: pa[1], bx: pb[0], by: pb[1], inlier, error: d.residual(i, j, pa, pb) })
+                .collect()
+        })
+        .unwrap_or_default();
+    let manual = manual
+        .iter()
+        .map(|m| {
+            let (pa, pb) = if m.a == a { ([m.ax, m.ay], [m.bx, m.by]) } else { ([m.bx, m.by], [m.ax, m.ay]) };
+            d.residual(i, j, pa, pb)
+        })
+        .collect();
+    Ok(PairMatches { tested: pd.is_some(), accepted: pd.map(|p| p.accepted).unwrap_or(false), solved, auto, manual })
+}
+
+/// Where a point of image `a` should appear in image `b` according to the current alignment.
+#[tauri::command]
+pub fn predict_point(state: State<'_, Shared>, a: u32, b: u32, x: f64, y: f64) -> Option<[f64; 2]> {
+    let d = state.inner.lock().unwrap().diag.clone()?;
+    let (i, j) = (d.idx(a)?, d.idx(b)?);
+    let (ci, cj) = (d.cameras[i].as_ref()?, d.cameras[j].as_ref()?);
+    let ray = ci.ray_world(d.lens, x, y);
+    let (px, py) = cj.project_centered(d.lens, &(cj.rot.inverse() * ray))?;
+    let (cx, cy) = d.center(j);
+    let (px, py) = (px + cx, py + cy);
+    let (w, h) = d.sizes[j];
+    (px >= 0.0 && py >= 0.0 && px < w as f64 && py < h as f64).then_some([px, py])
 }
 
 fn aligned_works(g: &Inner) -> Res<(Arc<Aligned>, Vec<Arc<WorkImage>>)> {

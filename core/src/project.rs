@@ -74,6 +74,19 @@ pub struct Aligned {
 }
 
 pub fn run_align(works: &[Arc<WorkImage>], st: &AlignSettings, ph: &PhotoOptions, manual: &[align::ManualPoint], progress: &Progress, cancel: &Cancel) -> Result<Aligned, StitchError> {
+    run_align_diag(works, st, ph, manual, progress, cancel, &mut Vec::new())
+}
+
+/// [`run_align`] that also returns per-pair matching diagnostics (filled on failure too).
+pub fn run_align_diag(
+    works: &[Arc<WorkImage>],
+    st: &AlignSettings,
+    ph: &PhotoOptions,
+    manual: &[align::ManualPoint],
+    progress: &Progress,
+    cancel: &Cancel,
+    diag: &mut Vec<align::PairDiag>,
+) -> Result<Aligned, StitchError> {
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StageFeatures));
     let done = std::sync::atomic::AtomicUsize::new(0);
     let n = works.len();
@@ -109,7 +122,7 @@ pub fn run_align(works: &[Arc<WorkImage>], st: &AlignSettings, ph: &PhotoOptions
         .collect();
     cancel.check()?;
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StageMatching));
-    let alignment = align::align(&aimgs, st, manual, progress, cancel)?;
+    let alignment = align::align_with_diag(&aimgs, st, manual, progress, cancel, diag)?;
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StagePhotometric));
     let work: Vec<RgbImage> = works.iter().map(|w| w.img.clone()).collect();
     let scales: Vec<f64> = works.iter().map(|w| w.scale).collect();
