@@ -10,16 +10,18 @@
   import Tooltip from "./components/Tooltip.svelte";
   import ControlPoints from "./components/ControlPoints.svelte";
   import QualityBanner from "./components/QualityBanner.svelte";
+  import UpdateBanner from "./components/UpdateBanner.svelte";
+  import { upd, startUpdateChecks, checkForUpdate } from "./lib/updates.svelte";
   import { t, getLang } from "./lib/i18n.svelte";
   import { THEMES, type ThemeId } from "./lib/theme";
   import {
     S, app, vw, init, setLanguage, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
-    hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere, IS_MOBILE, setTheme,
+    hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere, IS_MOBILE, setTheme, toast,
   } from "./lib/store.svelte";
 
   const AUTHOR = "https://redzikowski.com";
   const REPO = "https://github.com/BlackSingularities/Panoramer";
-  const VERSION = "2.2.0";
+  const VERSION = $derived(upd.current || "2.2.0");
 
   let menuOpen = $state(false);
   let winW = $state(window.innerWidth);
@@ -35,9 +37,22 @@
 
   const step = $derived(!app.images.length ? 1 : !app.align ? 2 : 3);
   const unsaved = $derived(hasUnsavedWork());
+  let updHidden = $state(false);
+  const updPill = $derived(!!upd.available && (updHidden || S.settings.ui.skippedVersion === upd.available.version));
+
+  async function manualUpdateCheck() {
+    const ok = await checkForUpdate();
+    if (!ok) return toast(t("updFailed"), "error");
+    if (upd.available) {
+      updHidden = false;
+      S.settings.ui.skippedVersion = "";
+      persist();
+    } else toast(`${t("updLatest")} (${VERSION})`, "ok");
+  }
 
   onMount(() => {
     init();
+    startUpdateChecks(() => S.settings.ui.checkUpdates);
     const tick = setInterval(() => (now = Date.now()), 500);
     const unsubs: (() => void)[] = [];
     getCurrentWebview()
@@ -179,6 +194,11 @@
       </nav>{:else}<span class="grow"></span>{/if}
 
       <div class="actions">
+        {#if updPill && upd.available}
+          <button class="btn sm updpill" data-tip={t("updAvailable")} onclick={() => ((updHidden = false), (S.settings.ui.skippedVersion = ""), persist())}>
+            <span class="udot2"></span>{#if !compact}{upd.available.version}{:else}<Icon name="download" size={14} />{/if}
+          </button>
+        {/if}
         {#if !compact}<button class="btn" onclick={pickFiles} data-tip="Ctrl+O"><Icon name="plus" size={16} />{t("addImages")}</button>{/if}
         <button class="btn blue" class:icon={compact} disabled={busyBlocking() || readyIds().length < 2} onclick={align} data-tip="Ctrl+Enter"><Icon name="align" size={16} />{#if !compact}{t("align")}{/if}</button>
         <button class="btn primary" class:icon={compact} disabled={!app.align || busyBlocking()} onclick={renderAndSave} data-tip="Ctrl+S"><Icon name="download" size={16} />{#if !compact}{t("export")}{/if}</button>
@@ -232,6 +252,10 @@
               <button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>
               <button onclick={() => ((menuOpen = false), (app.dialogs.log = true))}><Icon name="list" size={15} />{t("log")}</button>
               <button onclick={() => ((menuOpen = false), openUrl(REPO))}><Icon name="github" size={15} />{t("projectPage")}</button>
+              <button disabled={upd.checking} onclick={() => ((menuOpen = false), manualUpdateCheck())}><Icon name="download" size={15} />{upd.checking ? t("updChecking") : t("updCheck")}</button>
+              <label class="dcheck">
+                <input type="checkbox" bind:checked={S.settings.ui.checkUpdates} onchange={persist} />{t("updAuto")}
+              </label>
               <button onclick={() => ((menuOpen = false), (app.dialogs.about = true))}><Icon name="info" size={15} />{t("about")}</button>
             </div>
           {/if}
@@ -360,6 +384,8 @@
     {/each}
   </div>
 
+  <UpdateBanner bind:hidden={updHidden} />
+
   {#if app.dialogs.cp}<ControlPoints />{/if}
 
   {#if app.dialogs.about}
@@ -376,6 +402,7 @@
         <p>{t("aboutText")}</p>
         <div class="arow">
           <button class="btn sm" onclick={() => openUrl(REPO)}><Icon name="github" size={14} />GitHub</button>
+          <button class="btn sm" disabled={upd.checking} onclick={manualUpdateCheck}><Icon name="download" size={14} />{upd.checking ? t("updChecking") : t("updCheck")}</button>
           <span class="muted small">{t("license")}</span>
         </div>
         <button class="btn" onclick={() => (app.dialogs.about = false)}>{t("close")}</button>
@@ -665,6 +692,27 @@
   }
   .dropdown > button:hover {
     background: var(--raised-2);
+  }
+  .dcheck {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 9px;
+    font-size: 12px;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .dcheck input {
+    margin: 0 1px;
+  }
+  .updpill {
+    gap: 7px;
+  }
+  .udot2 {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
   }
   .dsep {
     height: 1px;

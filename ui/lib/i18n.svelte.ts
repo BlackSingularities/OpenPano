@@ -277,6 +277,18 @@ const D = {
   tabPreview: ["Podgląd", "Preview"],
   tabSettings: ["Ustawienia", "Settings"],
   stageLoading: ["Wczytywanie zdjęć", "Loading images"],
+  updAvailable: ["Dostępna nowa wersja", "New version available"],
+  updText: ["Możesz zaktualizować Panoramer – Twoja wersja:", "You can update Panoramer – your version:"],
+  updDownload: ["Pobierz", "Download"],
+  updNotes: ["Co nowego", "What's new"],
+  updSkip: ["Pomiń tę wersję", "Skip this version"],
+  updLater: ["Później", "Later"],
+  updCheck: ["Sprawdź aktualizacje", "Check for updates"],
+  updAuto: ["Sprawdzaj automatycznie", "Check automatically"],
+  updLatest: ["Masz najnowszą wersję", "You have the latest version"],
+  updFailed: ["Nie udało się sprawdzić aktualizacji (brak połączenia?)", "Could not check for updates (offline?)"],
+  updChecking: ["Sprawdzanie…", "Checking…"],
+  updIos: ["Zainstaluj nowy plik IPA tak samo jak poprzedni (AltStore / Sideloadly).", "Install the new IPA the same way as before (AltStore / Sideloadly)."],
 } as const;
 
 export type TKey = keyof typeof D;

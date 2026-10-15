@@ -53,7 +53,7 @@ export interface Settings {
   photo: { exposure: boolean; color: boolean; vignetting: boolean };
   render: RenderSettings;
   output: { format: OutFormat; jpeg_quality: number; transparent: boolean; gpano: boolean };
-  ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string };
+  ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string; checkUpdates: boolean; skippedVersion: string };
 }
 
 export const defaultRender = (): RenderSettings => ({
@@ -83,7 +83,7 @@ const defaults = (): Settings => ({
   photo: { exposure: true, color: true, vignetting: true },
   render: { ...defaultRender(), max_megapixels: IS_MOBILE ? 60 : 300 },
   output: { format: "Auto", jpeg_quality: 95, transparent: false, gpano: true },
-  ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44" },
+  ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44", checkUpdates: true, skippedVersion: "" },
 });
 
 export interface ImageItem {
