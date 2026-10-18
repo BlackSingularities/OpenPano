@@ -23,7 +23,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
       - name: Test engine
-        run: cargo test --release -p panoramer-core
+        run: cargo test --release -p openpano-core
       - name: Build installer
         run: npx tauri build
       - name: Collect artifacts
@@ -33,14 +33,14 @@ jobs:
           $v = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
           "version=$v" >> $env:GITHUB_OUTPUT
           New-Item -ItemType Directory -Force dist-release | Out-Null
-          Get-ChildItem target/release/bundle/nsis/*.exe | ForEach-Object { Copy-Item $_ "dist-release/Panoramer-$v-setup-x64.exe" }
-          Copy-Item target/release/panoramer.exe "dist-release/Panoramer-$v-portable-x64.exe"
+          Get-ChildItem target/release/bundle/nsis/*.exe | ForEach-Object { Copy-Item $_ "dist-release/OpenPano-$v-setup-x64.exe" }
+          Copy-Item target/release/openpano.exe "dist-release/OpenPano-$v-portable-x64.exe"
           Get-ChildItem dist-release
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.ver.outputs.version) }}
-          name: Panoramer ${{ steps.ver.outputs.version }}
+          name: OpenPano ${{ steps.ver.outputs.version }}
           generate_release_notes: true
           files: dist-release/*
 
@@ -84,8 +84,8 @@ jobs:
           echo "unsigned: $APK"
           $BT/zipalign -f -p 4 "$APK" aligned.apk
           mkdir -p out
-          $BT/apksigner sign --ks ks.p12 --ks-type PKCS12 --ks-pass env:KS_PASS --out "out/Panoramer-$V-android.apk" aligned.apk
-          $BT/apksigner verify "out/Panoramer-$V-android.apk"
+          $BT/apksigner sign --ks ks.p12 --ks-type PKCS12 --ks-pass env:KS_PASS --out "out/OpenPano-$V-android.apk" aligned.apk
+          $BT/apksigner verify "out/OpenPano-$V-android.apk"
           rm ks.p12
       - uses: softprops/action-gh-release@v2
         with:
@@ -112,9 +112,9 @@ jobs:
           npm run build
           npx tauri ios init --ci
           # Build the Rust library ourselves (the Xcode phase expects a running tauri CLI).
-          cargo build --release --lib -p panoramer --target aarch64-apple-ios --features tauri/custom-protocol
+          cargo build --release --lib -p openpano --target aarch64-apple-ios --features tauri/custom-protocol
           mkdir -p src-tauri/gen/apple/Externals/arm64/release
-          cp target/aarch64-apple-ios/release/libpanoramer_lib.a src-tauri/gen/apple/Externals/arm64/release/libapp.a
+          cp target/aarch64-apple-ios/release/libopenpano_lib.a src-tauri/gen/apple/Externals/arm64/release/libapp.a
           PROJ=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
           # neutralise the "Build Rust Code" phase
           sed -i '' -E '/shellScript = .*xcode-script/s/shellScript = .*;/shellScript = "true";/' "$PROJ/project.pbxproj"
@@ -127,7 +127,7 @@ jobs:
           echo "app: $APP"; ls -la "$APP" | head
           test -f "$APP/$(defaults read "$PWD/$APP/Info.plist" CFBundleExecutable)"
           mkdir -p Payload out && cp -R "$APP" Payload/
-          zip -qr "out/Panoramer-$V-ios-unsigned.ipa" Payload
+          zip -qr "out/OpenPano-$V-ios-unsigned.ipa" Payload
           ls -la out
       - uses: softprops/action-gh-release@v2
         with:

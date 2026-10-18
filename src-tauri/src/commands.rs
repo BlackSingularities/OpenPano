@@ -1,14 +1,14 @@
 //! Tauri commands bridging the web UI and the stitching engine.
 
 use base64::Engine;
-use panoramer_core::i18n::{self, Lang};
-use panoramer_core::output::OutputSettings;
-use panoramer_core::preview::Sphere;
-use panoramer_core::project::{self, Aligned, PhotoOptions, WorkImage};
-use panoramer_core::stitch::align::{AlignSettings, Camera, FocalSource, PairDiag};
-use panoramer_core::stitch::geometry::{LensType, Projection};
-use panoramer_core::stitch::render::{self, RenderSettings};
-use panoramer_core::stitch::{Cancel, Progress, StitchError};
+use openpano_core::i18n::{self, Lang};
+use openpano_core::output::OutputSettings;
+use openpano_core::preview::Sphere;
+use openpano_core::project::{self, Aligned, PhotoOptions, WorkImage};
+use openpano_core::stitch::align::{AlignSettings, Camera, FocalSource, PairDiag};
+use openpano_core::stitch::geometry::{LensType, Projection};
+use openpano_core::stitch::render::{self, RenderSettings};
+use openpano_core::stitch::{Cancel, Progress, StitchError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -177,8 +177,8 @@ pub fn cancel_job(state: State<'_, Shared>) {
 
 #[tauri::command]
 pub fn supported_extensions() -> Vec<String> {
-    let mut v: Vec<String> = panoramer_core::loader::RASTER_EXTENSIONS.iter().map(|s| s.to_string()).collect();
-    v.extend(panoramer_core::raw::RAW_EXTENSIONS.iter().map(|s| s.to_string()));
+    let mut v: Vec<String> = openpano_core::loader::RASTER_EXTENSIONS.iter().map(|s| s.to_string()).collect();
+    v.extend(openpano_core::raw::RAW_EXTENSIONS.iter().map(|s| s.to_string()));
     v
 }
 
@@ -222,7 +222,7 @@ fn thumb_data_url(w: &WorkImage) -> String {
 #[tauri::command]
 pub fn add_images(app: AppHandle, state: State<'_, Shared>, paths: Vec<String>) -> Vec<Added> {
     let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
-    let paths = panoramer_core::loader::expand_paths(&paths);
+    let paths = openpano_core::loader::expand_paths(&paths);
     register_and_load(&app, &state, paths)
 }
 
@@ -248,7 +248,7 @@ fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Ve
         return added;
     }
     let jobs: Vec<(u32, PathBuf)> = added.iter().map(|a| (a.id, PathBuf::from(&a.path))).collect();
-    let (_p, cancel, done) = begin_job(app, state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageLoading));
+    let (_p, cancel, done) = begin_job(app, state, openpano_core::i18n::tr(openpano_core::i18n::Key::StageLoading));
     let app2 = app.clone();
     std::thread::spawn(move || {
         use rayon::prelude::*;
@@ -259,7 +259,7 @@ fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Ve
         pool.install(|| {
             jobs.par_iter().for_each(|(id, path)| {
                 let ev = if cancel.is_cancelled() {
-                    Loaded { id: *id, ok: false, error: Some(panoramer_core::i18n::tr(panoramer_core::i18n::Key::Cancelled).into()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new() }
+                    Loaded { id: *id, ok: false, error: Some(openpano_core::i18n::tr(openpano_core::i18n::Key::Cancelled).into()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new() }
                 } else {
                     match project::load_work(path) {
                         Ok(w) => {
@@ -460,20 +460,20 @@ pub async fn align(
     photo: PhotoOptions,
     manual: Option<Vec<ManualDto>>,
 ) -> Res<AlignInfo> {
-    let manual: Vec<panoramer_core::stitch::align::ManualPoint> = manual
+    let manual: Vec<openpano_core::stitch::align::ManualPoint> = manual
         .unwrap_or_default()
         .into_iter()
         .filter_map(|m| {
             let i = ids.iter().position(|x| *x == m.a)?;
             let j = ids.iter().position(|x| *x == m.b)?;
-            Some(panoramer_core::stitch::align::ManualPoint { i, j, a: [m.ax, m.ay], b: [m.bx, m.by] })
+            Some(openpano_core::stitch::align::ManualPoint { i, j, a: [m.ax, m.ay], b: [m.bx, m.by] })
         })
         .collect();
     let works: Vec<Arc<WorkImage>> = {
         let g = state.inner.lock().unwrap();
         ids.iter().map(|id| g.works.get(id).cloned().ok_or_else(|| format!("image {id} not loaded"))).collect::<Res<_>>()?
     };
-    let (progress, cancel, done) = begin_job(&app, &state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageFeatures));
+    let (progress, cancel, done) = begin_job(&app, &state, openpano_core::i18n::tr(openpano_core::i18n::Key::StageFeatures));
     let t0 = std::time::Instant::now();
     let sizes: Vec<(usize, usize)> = works.iter().map(|w| (w.full_w, w.full_h)).collect();
     let settings_lens = settings.lens;
@@ -718,7 +718,7 @@ pub struct SphereInfo {
 #[tauri::command]
 pub async fn build_sphere(app: AppHandle, state: State<'_, Shared>, render: RenderSettings, megapixels: f64) -> Res<SphereInfo> {
     let (al, works) = aligned_works(&state.inner.lock().unwrap())?;
-    let (progress, cancel, done) = begin_job(&app, &state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StagePreview));
+    let (progress, cancel, done) = begin_job(&app, &state, openpano_core::i18n::tr(openpano_core::i18n::Key::StagePreview));
     let r = tauri::async_runtime::spawn_blocking(move || project::build_sphere(&works, &al, &render, megapixels, &progress, &cancel))
         .await
         .map_err(err)?;
@@ -784,12 +784,12 @@ pub struct RenderInfo {
 #[tauri::command]
 pub async fn render_and_save(app: AppHandle, state: State<'_, Shared>, path: String, render: RenderSettings, output: OutputSettings) -> Res<RenderInfo> {
     let (al, works) = aligned_works(&state.inner.lock().unwrap())?;
-    let (progress, cancel, done) = begin_job(&app, &state, panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageRendering));
+    let (progress, cancel, done) = begin_job(&app, &state, openpano_core::i18n::tr(openpano_core::i18n::Key::StageRendering));
     let t0 = std::time::Instant::now();
     let path2 = PathBuf::from(&path);
     let r = tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize, usize), StitchError> {
         let out = project::render_full(&works, &al, &render, &progress, &cancel)?;
-        progress.set_stage(panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageSaving));
+        progress.set_stage(openpano_core::i18n::tr(openpano_core::i18n::Key::StageSaving));
         let fmt = project::save_output(&path2, &out, &works, &output)?;
         Ok((format!("{:?}", fmt), out.image.w, out.image.h))
     })
@@ -821,7 +821,7 @@ pub struct WorkPreview {
 #[tauri::command]
 pub fn work_preview(state: State<'_, Shared>, id: u32) -> Res<WorkPreview> {
     let w = state.inner.lock().unwrap().works.get(&id).cloned().ok_or("image not loaded")?;
-    let conv = panoramer_core::imaging::ToSrgb8::new();
+    let conv = openpano_core::imaging::ToSrgb8::new();
     let rgb: Vec<u8> = w.img.data.iter().flat_map(|p| [conv.conv(p[0]), conv.conv(p[1]), conv.conv(p[2])]).collect();
     let mut buf = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 88)

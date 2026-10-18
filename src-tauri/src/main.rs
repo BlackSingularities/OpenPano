@@ -6,7 +6,7 @@ fn main() {
         attach_console();
         std::process::exit(cli::run(&args));
     }
-    panoramer_lib::run();
+    openpano_lib::run();
 }
 
 #[cfg(target_os = "windows")]
@@ -24,21 +24,21 @@ fn attach_console() {
 fn attach_console() {}
 
 mod cli {
-    use panoramer_core::i18n::{self, Lang};
-    use panoramer_core::output::{OutputFormat, OutputSettings};
-    use panoramer_core::project;
-    use panoramer_core::stitch::align::AlignSettings;
-    use panoramer_core::stitch::geometry::{LensType, Projection};
-    use panoramer_core::stitch::render::{BlendMode, CropMode, RenderSettings};
-    use panoramer_core::stitch::{Cancel, Progress};
+    use openpano_core::i18n::{self, Lang};
+    use openpano_core::output::{OutputFormat, OutputSettings};
+    use openpano_core::project;
+    use openpano_core::stitch::align::AlignSettings;
+    use openpano_core::stitch::geometry::{LensType, Projection};
+    use openpano_core::stitch::render::{BlendMode, CropMode, RenderSettings};
+    use openpano_core::stitch::{Cancel, Progress};
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    const HELP: &str = "Panoramer — panorama stitcher
+    const HELP: &str = "OpenPano — panorama stitcher
 
 USAGE:
-    panoramer --cli [OPTIONS] -o <OUTPUT> <IMAGES or FOLDERS>...
-    panoramer [IMAGES...]            (opens the GUI)
+    openpano --cli [OPTIONS] -o <OUTPUT> <IMAGES or FOLDERS>...
+    openpano [IMAGES...]            (opens the GUI)
 
 OPTIONS:
     -o, --output <FILE>        Output file (.jpg, .tif, .png, .dng)
@@ -85,7 +85,7 @@ OPTIONS:
 
     pub fn run(args: &[String]) -> i32 {
         if args.iter().any(|a| a == "--version") {
-            println!("Panoramer {}", env!("CARGO_PKG_VERSION"));
+            println!("OpenPano {}", env!("CARGO_PKG_VERSION"));
             return 0;
         }
         if args.iter().any(|a| a == "-h" || a == "--help") {
@@ -203,9 +203,9 @@ OPTIONS:
             eprintln!("missing --output\n\n{HELP}");
             return 2;
         };
-        let inputs = panoramer_core::loader::expand_paths(&inputs);
+        let inputs = openpano_core::loader::expand_paths(&inputs);
         if inputs.len() < 2 {
-            eprintln!("{}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::ErrNotEnough));
+            eprintln!("{}", openpano_core::i18n::tr(openpano_core::i18n::Key::ErrNotEnough));
             return 2;
         }
         os.format = fmt.unwrap_or_else(|| match out.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
@@ -218,7 +218,7 @@ OPTIONS:
         let t0 = std::time::Instant::now();
         let progress = Progress::default();
         let cancel = Cancel::default();
-        eprintln!("[1/4] {} ({})", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageLoading), inputs.len());
+        eprintln!("[1/4] {} ({})", openpano_core::i18n::tr(openpano_core::i18n::Key::StageLoading), inputs.len());
         let works: Vec<Arc<project::WorkImage>> = {
             use rayon::prelude::*;
             let r: Vec<_> = inputs.par_iter().map(|p| (p, project::load_work(p))).collect();
@@ -231,11 +231,11 @@ OPTIONS:
             }
             v
         };
-        eprintln!("[2/4] {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageMatching));
+        eprintln!("[2/4] {}", openpano_core::i18n::tr(openpano_core::i18n::Key::StageMatching));
         let al = match project::run_align(&works, &st, &ph, &[], &progress, &cancel) {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("{}: {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::AlignFailed), e);
+                eprintln!("{}: {}", openpano_core::i18n::tr(openpano_core::i18n::Key::AlignFailed), e);
                 return 1;
             }
         };
@@ -245,20 +245,20 @@ OPTIONS:
             works.len(),
             al.alignment.rms_px
         );
-        eprintln!("[3/4] {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageRendering));
+        eprintln!("[3/4] {}", openpano_core::i18n::tr(openpano_core::i18n::Key::StageRendering));
         let res = match project::render_full(&works, &al, &rs, &progress, &cancel) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("{}: {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::RenderFailed), e);
+                eprintln!("{}: {}", openpano_core::i18n::tr(openpano_core::i18n::Key::RenderFailed), e);
                 return 1;
             }
         };
-        eprintln!("[4/4] {} {}", panoramer_core::i18n::tr(panoramer_core::i18n::Key::StageSaving), out.display());
+        eprintln!("[4/4] {} {}", openpano_core::i18n::tr(openpano_core::i18n::Key::StageSaving), out.display());
         match project::save_output(&out, &res, &works, &os) {
             Ok(f) => {
                 eprintln!(
                     "{} {} ({}×{}, {:?}) · {:.1} s",
-                    panoramer_core::i18n::tr(panoramer_core::i18n::Key::Saved),
+                    openpano_core::i18n::tr(openpano_core::i18n::Key::Saved),
                     out.display(),
                     res.image.w,
                     res.image.h,

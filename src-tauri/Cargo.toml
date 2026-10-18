@@ -1,21 +1,21 @@
 [package]
-name = "panoramer"
+name = "openpano"
 version.workspace = true
 edition = "2021"
-description = "Panoramer - professional panorama stitcher"
+description = "OpenPano - professional panorama stitcher"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/BlackSingularities/Panoramer"
+repository = "https://github.com/BlackSingularities/OpenPano"
 authors = ["redzikowski.com"]
 
 [lib]
-name = "panoramer_lib"
+name = "openpano_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-panoramer-core = { path = "../core" }
+openpano-core = { path = "../core" }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

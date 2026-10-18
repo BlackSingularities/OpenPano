@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-const API = "https://api.github.com/repos/BlackSingularities/Panoramer/releases/latest";
+const API = "https://api.github.com/repos/BlackSingularities/OpenPano/releases/latest";
 const RECHECK_MS = 6 * 3600 * 1000;
 
 export interface UpdateInfo {

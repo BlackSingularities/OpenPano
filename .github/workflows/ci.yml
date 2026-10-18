@@ -20,10 +20,10 @@ jobs:
       - name: Type-check UI
         run: npm run check
       - name: Test engine
-        run: cargo test --release -p panoramer-core
+        run: cargo test --release -p openpano-core
       - name: Build app
         run: npx tauri build --no-bundle
       - uses: actions/upload-artifact@v4
         with:
-          name: panoramer-exe
-          path: target/release/panoramer.exe
+          name: openpano-exe
+          path: target/release/openpano.exe

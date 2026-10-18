@@ -315,7 +315,7 @@ pub fn align_with_diag(
             let rays: Vec<(V3, V3)> = pts.iter().map(|(a, b)| (st.lens.ray(a[0], a[1], fi), st.lens.ray(b[0], b[1], fj))).collect();
             let inl = ransac_rotation(&rays, ang_thr, 800).map(|(_, v)| v).unwrap_or_default();
             let need = (8.0 + 0.3 * pts.len() as f64).max(15.0);
-            if std::env::var_os("PANORAMER_DEBUG").is_some() {
+            if std::env::var_os("OPENPANO_DEBUG").is_some() {
                 eprintln!("pair {}-{}: matches {} inliers {} need {:.0} f {:.0}", i, j, pts.len(), inl.len(), need, fi);
             }
             let accepted = inl.len() as f64 >= need;
@@ -525,7 +525,7 @@ fn search_focal(imgs: &[AlignImage], raw: &[(usize, usize, Vec<([f64; 2], [f64; 
             best = (s, h);
         }
     }
-    if std::env::var_os("PANORAMER_DEBUG").is_some() {
+    if std::env::var_os("OPENPANO_DEBUG").is_some() {
         eprintln!("focal search: hfov {:.2} deg, score {}", best.1, best.0);
     }
     Some(best.1)

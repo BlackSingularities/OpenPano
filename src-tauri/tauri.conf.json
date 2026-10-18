@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Panoramer",
+  "productName": "OpenPano",
   "version": "2.2.0",
   "identifier": "com.redzikowski.panoramer",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Panoramer",
+        "title": "OpenPano",
         "width": 1560,
         "height": 960,
         "minWidth": 1100,
@@ -38,7 +38,7 @@
     "homepage": "https://redzikowski.com",
     "category": "Photography",
     "shortDescription": "Professional panorama stitcher",
-    "longDescription": "Panoramer stitches photos (JPEG, TIFF, RAW) into spherical 360°, cylindrical, rectilinear and other panoramas. Idea and development: redzikowski.com",
+    "longDescription": "OpenPano stitches photos (JPEG, TIFF, RAW) into spherical 360°, cylindrical, rectilinear and other panoramas. Idea and development: redzikowski.com",
     "licenseFile": "../LICENSE",
     "icon": [
       "icons/32x32.png",

@@ -1,18 +1,18 @@
-<p align="center"><img src="assets/icon256.png" width="128" alt="Panoramer"></p>
+<p align="center"><img src="assets/icon256.png" width="128" alt="OpenPano"></p>
 
-<h1 align="center">Panoramer</h1>
+<h1 align="center">OpenPano</h1>
 
 <p align="center">
 Profesjonalne narzędzie do łączenia zdjęć w panoramy · Professional panorama stitcher<br>
 Pomysł i wykonanie / Idea and development: <a href="https://redzikowski.com"><b>redzikowski.com</b></a><br>
-<a href="https://github.com/BlackSingularities/Panoramer/releases/latest"><b>⬇ Pobierz / Download</b></a>
+<a href="https://github.com/BlackSingularities/OpenPano/releases/latest"><b>⬇ Pobierz / Download</b></a>
 </p>
 
 ---
 
 ## 🇵🇱 Po polsku
 
-Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne, prostoliniowe, Panini, „małą planetę” i inne. Silnik jest napisany w Ruście, a nowoczesny interfejs w Tauri 2 + Svelte. Podgląd renderuje karta graficzna (WebGL), więc obracanie i zmiana projekcji działają płynnie w czasie rzeczywistym. Interfejs jest po polsku i angielsku, z podpowiedziami przy każdej opcji.
+OpenPano łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne, prostoliniowe, Panini, „małą planetę” i inne. Silnik jest napisany w Ruście, a nowoczesny interfejs w Tauri 2 + Svelte. Podgląd renderuje karta graficzna (WebGL), więc obracanie i zmiana projekcji działają płynnie w czasie rzeczywistym. Interfejs jest po polsku i angielsku, z podpowiedziami przy każdej opcji.
 
 ### Możliwości
 - **Pliki wejściowe:** JPEG, TIFF, PNG, WebP, BMP oraz **RAW**: ARW, NEF, CR2, DNG, RAF, ORF, RW2, PEF, SRW, 3FR, IIQ i inne (obsługiwane przez rawloader; CR3 nie jest obsługiwany).
@@ -43,10 +43,10 @@ Panoramer łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne
 - **Tryb wiersza poleceń** do pracy wsadowej.
 
 ### Instalacja
-Pobierz z [Releases](https://github.com/BlackSingularities/Panoramer/releases/latest):
-- **Windows:** `Panoramer-x.y.z-setup-x64.exe` (instalator PL/EN) lub `…-portable-x64.exe` (bez instalacji),
-- **Android:** `Panoramer-x.y.z-android.apk` (Android 8.0+). Otwórz plik i zezwól na instalację z tego źródła,
-- **iOS:** `Panoramer-x.y.z-ios-unsigned.ipa`. Plik nie jest podpisany (wymaga to konta Apple Developer); zainstaluj go przez AltStore lub Sideloadly, które podpiszą go Twoim Apple ID.
+Pobierz z [Releases](https://github.com/BlackSingularities/OpenPano/releases/latest):
+- **Windows:** `OpenPano-x.y.z-setup-x64.exe` (instalator PL/EN) lub `…-portable-x64.exe` (bez instalacji),
+- **Android:** `OpenPano-x.y.z-android.apk` (Android 8.0+). Otwórz plik i zezwól na instalację z tego źródła,
+- **iOS:** `OpenPano-x.y.z-ios-unsigned.ipa`. Plik nie jest podpisany (wymaga to konta Apple Developer); zainstaluj go przez AltStore lub Sideloadly, które podpiszą go Twoim Apple ID.
 
 ### Motywy
 - **Telefon:** ciemny (AMOLED) i jasny.
@@ -64,7 +64,7 @@ Wskazówka: zdjęcia powinny nachodzić na siebie w 20–40%. Jeśli w zdjęciac
 
 ## 🇬🇧 English
 
-Panoramer stitches photo series into panoramas: spherical 360°×180°, cylindrical, rectilinear, Panini, little planet and more. The engine is written in Rust and the modern UI uses Tauri 2 + Svelte with a GPU (WebGL) real-time preview. Polish/English interface with tooltips for every option.
+OpenPano stitches photo series into panoramas: spherical 360°×180°, cylindrical, rectilinear, Panini, little planet and more. The engine is written in Rust and the modern UI uses Tauri 2 + Svelte with a GPU (WebGL) real-time preview. Polish/English interface with tooltips for every option.
 
 ### Features
 - **Input:** JPEG, TIFF, PNG, WebP, BMP and **RAW**: ARW, NEF, CR2, DNG, RAF, ORF, RW2, PEF, SRW, 3FR, IIQ… (CR3 is not supported).
@@ -78,9 +78,9 @@ Panoramer stitches photo series into panoramas: spherical 360°×180°, cylindri
 
 ### Command line
 ```
-panoramer --cli -p equirectangular --full-sphere -o pano.jpg C:\photos\set1
-panoramer --cli -p cylindrical --scale 50 -o pano.dng *.ARW
-panoramer --help
+openpano --cli -p equirectangular --full-sphere -o pano.jpg C:\photos\set1
+openpano --cli -p cylindrical --scale 50 -o pano.dng *.ARW
+openpano --help
 ```
 
 ### Building

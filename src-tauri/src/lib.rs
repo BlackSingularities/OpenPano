@@ -1,4 +1,4 @@
-//! Panoramer application (desktop + mobile).
+//! OpenPano application (desktop + mobile).
 
 mod commands;
 
@@ -39,7 +39,7 @@ pub fn run() {
             portable_build,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Panoramer");
+        .expect("error while running OpenPano");
 }
 
 struct StartupFiles(Vec<String>);
@@ -52,7 +52,7 @@ fn startup_files(state: tauri::State<'_, StartupFiles>) -> Vec<String> {
 /// Hidden helper for automated UI checks.
 #[tauri::command]
 fn auto_align_flag() -> bool {
-    std::env::var_os("PANORAMER_AUTOALIGN").is_some()
+    std::env::var_os("OPENPANO_AUTOALIGN").is_some()
 }
 
 /// True for the portable Windows exe (the NSIS installer puts uninstall.exe next to it),

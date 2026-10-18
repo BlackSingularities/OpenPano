@@ -72,7 +72,7 @@ keys! {
     Shortcuts => "Skróty klawiszowe", "Keyboard shortcuts";
     IdeaBy => "Pomysł i wykonanie:", "Idea and development:";
     NotExported => "niewyeksportowane", "not exported";
-    ExitTitle => "Zamknąć Panoramer?", "Quit Panoramer?";
+    ExitTitle => "Zamknąć OpenPano?", "Quit OpenPano?";
     ExitQuestion => "Panorama nie została wyeksportowana po ostatnich zmianach. Czy na pewno chcesz wyjść? Niezapisana praca zostanie utracona.",
         "The panorama has not been exported since the last changes. Do you really want to quit? Unsaved work will be lost.";
     ExitRendering => "Trwa renderowanie – wyjście je przerwie.", "Rendering is in progress – quitting will abort it.";

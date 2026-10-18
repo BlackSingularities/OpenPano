@@ -20,7 +20,7 @@
   } from "./lib/store.svelte";
 
   const AUTHOR = "https://redzikowski.com";
-  const REPO = "https://github.com/BlackSingularities/Panoramer";
+  const REPO = "https://github.com/BlackSingularities/OpenPano";
   const VERSION = $derived(upd.current || "2.2.0");
 
   let menuOpen = $state(false);
@@ -178,7 +178,7 @@
       <div class="brand">
         <img src="/icon.png" alt="" />
         <div>
-          <div class="bname">Panoramer</div>
+          <div class="bname">OpenPano</div>
           <div class="btag">{t("appTagline")}</div>
         </div>
       </div>
@@ -355,7 +355,7 @@
       {/if}
       <span class="grow"></span>
       {#if unsaved && app.align}<span class="unsaved"><span class="udot"></span>{t("notExported")}</span>{/if}
-      <span class="muted">Panoramer {VERSION}</span>
+      <span class="muted">OpenPano {VERSION}</span>
       {#if !compact}<button class="link" onclick={() => openUrl(AUTHOR)}>redzikowski.com</button>{/if}
     </footer>
     {#if compact}
@@ -394,7 +394,7 @@
     <div class="modal-bg" onclick={() => (app.dialogs.about = false)}>
       <div class="modal about" onclick={(e) => e.stopPropagation()}>
         <img src="/icon.png" alt="" class="alogo" />
-        <h2>Panoramer <span>{VERSION}</span></h2>
+        <h2>OpenPano <span>{VERSION}</span></h2>
         <div class="credit">
           <span>{t("ideaBy")}</span>
           <button class="link big" onclick={() => openUrl(AUTHOR)}>redzikowski.com</button>

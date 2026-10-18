@@ -1,4 +1,4 @@
-//! Panoramer core: image loading (raster + RAW), panorama registration, rendering and output.
+//! OpenPano core: image loading (raster + RAW), panorama registration, rendering and output.
 
 pub mod i18n;
 pub mod imaging;

@@ -90,14 +90,14 @@ pub fn gpano_xmp(out: &RenderOutput) -> Option<String> {
     Some(format!(
         concat!(
             "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>",
-            "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Panoramer\">",
+            "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"OpenPano\">",
             "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">",
             "<rdf:Description rdf:about=\"\" xmlns:GPano=\"http://ns.google.com/photos/1.0/panorama/\"",
             " GPano:UsePanoramaViewer=\"True\" GPano:ProjectionType=\"equirectangular\"",
             " GPano:CroppedAreaImageWidthPixels=\"{w}\" GPano:CroppedAreaImageHeightPixels=\"{h}\"",
             " GPano:FullPanoWidthPixels=\"{fw}\" GPano:FullPanoHeightPixels=\"{fh}\"",
             " GPano:CroppedAreaLeftPixels=\"{l}\" GPano:CroppedAreaTopPixels=\"{t}\"",
-            " GPano:PoseHeadingDegrees=\"0.0\" GPano:StitchingSoftware=\"Panoramer {ver}\"/>",
+            " GPano:PoseHeadingDegrees=\"0.0\" GPano:StitchingSoftware=\"OpenPano {ver}\"/>",
             "</rdf:RDF></x:xmpmeta><?xpacket end=\"w\"?>"
         ),
         w = w,
@@ -296,16 +296,16 @@ pub fn save_dng(path: &Path, img: &RgbImage, info: &SourceInfo, xmp: Option<&str
         (278, Val::Long(vec![rows_per_strip as u32])),
         (279, Val::Long(strips.iter().map(|s| s.len() as u32).collect())),
         (284, Val::Short(vec![1])),
-        (305, Val::Ascii(format!("Panoramer {}", env!("CARGO_PKG_VERSION")))),
+        (305, Val::Ascii(format!("OpenPano {}", env!("CARGO_PKG_VERSION")))),
         (339, Val::Short(vec![3, 3, 3])),
         (50706, Val::Byte(vec![1, 4, 0, 0])),
         (50707, Val::Byte(vec![1, 4, 0, 0])),
-        (50708, Val::Ascii(format!("{} {} (Panoramer)", make, model))),
+        (50708, Val::Ascii(format!("{} {} (OpenPano)", make, model))),
         (50721, Val::SRational(cm.iter().map(|v| srat(*v)).collect())),
         (50728, Val::Rational(vec![(1, 1), (1, 1), (1, 1)])),
         (50730, Val::SRational(vec![(0, 1)])),
         (50778, Val::Short(vec![21])),
-        (50936, Val::Ascii("Panoramer Linear sRGB".into())),
+        (50936, Val::Ascii("OpenPano Linear sRGB".into())),
     ];
     if let Some(x) = xmp {
         entries.push((700, Val::Byte(x.as_bytes().to_vec())));
