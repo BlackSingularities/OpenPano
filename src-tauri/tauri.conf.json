@@ -38,7 +38,7 @@
     "homepage": "https://redzikowski.com",
     "category": "Photography",
     "shortDescription": "Professional panorama stitcher",
-    "longDescription": "OpenPano stitches photos (JPEG, TIFF, RAW) into spherical 360°, cylindrical, rectilinear and other panoramas. Idea and development: redzikowski.com",
+    "longDescription": "OpenPano stitches photos (JPEG, TIFF, RAW) into spherical 360°, cylindrical, rectilinear and other panoramas. Design and development: redzikowski.com",
     "licenseFile": "../LICENSE",
     "icon": [
       "icons/32x32.png",

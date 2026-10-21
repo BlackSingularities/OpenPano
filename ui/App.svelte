@@ -402,6 +402,7 @@
         <p>{t("aboutText")}</p>
         <div class="arow">
           <button class="btn sm" onclick={() => openUrl(REPO)}><Icon name="github" size={14} />GitHub</button>
+          <button class="btn sm" onclick={() => openUrl("https://buycoffee.to/adamredzikowski")}>☕ {t("coffee")}</button>
           <button class="btn sm" disabled={upd.checking} onclick={manualUpdateCheck}><Icon name="download" size={14} />{upd.checking ? t("updChecking") : t("updCheck")}</button>
           <span class="muted small">{t("license")}</span>
         </div>
