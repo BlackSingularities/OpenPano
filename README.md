@@ -4,7 +4,7 @@
 
 <p align="center">
 Profesjonalne narzędzie do łączenia zdjęć w panoramy · Professional panorama stitcher<br>
-Pomysł i wykonanie / Idea and development: <a href="https://redzikowski.com"><b>redzikowski.com</b></a><br>
+Projekt i wykonanie / Design and development: <a href="https://redzikowski.com"><b>redzikowski.com</b></a><br>
 <a href="https://github.com/BlackSingularities/OpenPano/releases/latest"><b>⬇ Pobierz / Download</b></a>
 </p>
 
@@ -93,3 +93,7 @@ Releases are built by GitHub Actions: pushing a `v*` tag produces the NSIS insta
 
 ## License
 GPL-3.0-or-later.
+
+---
+
+<a href="https://buycoffee.to/adamredzikowski" target="_blank"><img src="https://buycoffee.to/static/img/share/share-button-dark--pl.png" style="width: 351px; height: 92px" width="351" height="92" alt="Postaw kawę dla adamredzikowski na buycoffee.to"></a>

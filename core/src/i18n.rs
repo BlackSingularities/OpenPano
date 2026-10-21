@@ -70,7 +70,7 @@ keys! {
     Redo => "Ponów", "Redo";
     UndoRedo => "Cofnij / ponów", "Undo / redo";
     Shortcuts => "Skróty klawiszowe", "Keyboard shortcuts";
-    IdeaBy => "Pomysł i wykonanie:", "Idea and development:";
+    IdeaBy => "Projekt i wykonanie:", "Design and development:";
     NotExported => "niewyeksportowane", "not exported";
     ExitTitle => "Zamknąć OpenPano?", "Quit OpenPano?";
     ExitQuestion => "Panorama nie została wyeksportowana po ostatnich zmianach. Czy na pewno chcesz wyjść? Niezapisana praca zostanie utracona.",

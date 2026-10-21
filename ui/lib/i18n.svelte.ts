@@ -171,7 +171,8 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   close: ["Zamknij", "Close"],
-  ideaBy: ["Pomysł i wykonanie", "Idea and development"],
+  ideaBy: ["Projekt i wykonanie", "Design and development"],
+  coffee: ["Postaw kawę", "Buy me a coffee"],
   aboutText: [
     "OpenPano łączy serie zdjęć w panoramy sferyczne 360°, cylindryczne, prostoliniowe, Panini, „małą planetę” i inne. Czyta pliki RAW i zapisuje liniowy DNG, TIFF, PNG lub JPEG.",
     "OpenPano stitches photo series into spherical 360°, cylindrical, rectilinear, Panini, little planet and other panoramas. Reads RAW files and writes linear DNG, TIFF, PNG or JPEG.",
