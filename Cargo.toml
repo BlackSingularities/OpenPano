@@ -3,7 +3,7 @@ members = ["core", "src-tauri"]
 resolver = "2"
 
 [workspace.package]
-version = "2.2.2"
+version = "2.2.3"
 
 [profile.release]
 opt-level = 3
