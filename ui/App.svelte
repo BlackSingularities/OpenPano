@@ -20,7 +20,7 @@
   } from "./lib/store.svelte";
 
   const AUTHOR = "https://redzikowski.com";
-  const REPO = "https://github.com/BlackSingularities/OpenPano";
+  const REPO = "https://redzikowski.com/portfolio/openpano";
   const VERSION = $derived(upd.current || "2.2.0");
 
   let menuOpen = $state(false);

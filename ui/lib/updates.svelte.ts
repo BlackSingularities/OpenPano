@@ -1,10 +1,10 @@
-// Update check against GitHub Releases – works the same on desktop, Android and iOS
-// (plain fetch from the webview; api.github.com allows CORS).
+// Update check against the release feed on redzikowski.com (GitHub-shaped, the repo is private)
+// – works the same on desktop, Android and iOS; plain fetch from the webview, the feed allows CORS.
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-const API = "https://api.github.com/repos/BlackSingularities/OpenPano/releases/latest";
+const API = "https://redzikowski.com/api/github/repos/BlackSingularities/OpenPano/releases/latest";
 const RECHECK_MS = 6 * 3600 * 1000;
 
 export interface UpdateInfo {
