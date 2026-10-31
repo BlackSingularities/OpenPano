@@ -361,10 +361,10 @@
     {#if compact}
       <nav class="tabs">
         <button class:on={tab === "images"} onclick={() => (tab = "images")}>
-          <span class="ti"><Icon name="image" size={20} /></span>{t("images")}{#if app.images.length}<b>{app.images.length}</b>{/if}
+          <span class="ti"><Icon name="image" size={21} /></span>{t("images")}{#if app.images.length}<b>{app.images.length}</b>{/if}
         </button>
-        <button class:on={tab === "view"} onclick={() => (tab = "view")}><span class="ti"><Icon name="sphere" size={20} /></span>{t("tabPreview")}</button>
-        <button class:on={tab === "settings"} onclick={() => (tab = "settings")}><span class="ti"><Icon name="sliders" size={20} /></span>{t("tabSettings")}</button>
+        <button class:on={tab === "view"} onclick={() => (tab = "view")}><span class="ti"><Icon name="sphere" size={21} /></span>{t("tabPreview")}</button>
+        <button class:on={tab === "settings"} onclick={() => (tab = "settings")}><span class="ti"><Icon name="sliders" size={21} /></span>{t("tabSettings")}</button>
       </nav>
     {/if}
   </div>
@@ -503,58 +503,61 @@
     flex: 1;
     min-height: 0;
   }
+  /* Styl wspólny dla aplikacji Open: wybrana zakładka to kafel z odwróconą ikoną i podpisem. */
   .tabs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    padding: 6px 10px calc(8px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: var(--surface);
+    gap: 4px;
+    padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
+    background: var(--bg);
   }
   .tabs button {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 3px;
-    padding: 4px 0;
+    padding: 7px 0 6px;
     border: 0;
-    background: none;
-    color: var(--text-3);
-    font-size: 11px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
     position: relative;
+    transition: background 0.15s, color 0.15s;
   }
   .tabs .ti {
-    width: 54px;
-    height: 30px;
-    border-radius: 999px;
+    width: 21px;
+    height: 21px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s, color 0.15s;
   }
   .tabs button.on {
-    color: var(--text);
-  }
-  .tabs button.on .ti {
     background: var(--sel-bg);
     color: var(--sel-fg);
+    font-weight: 700;
   }
   .tabs b {
     position: absolute;
-    top: 0;
-    left: calc(50% + 12px);
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 9px;
-    border: 1px solid var(--surface);
+    top: 3px;
+    left: calc(50% + 8px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
     background: var(--sel-bg);
     color: var(--sel-fg);
-    font-size: 10px;
+    font-size: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .tabs button.on b {
+    background: var(--sel-fg);
+    color: var(--sel-bg);
   }
   .grow {
     flex: 1;
