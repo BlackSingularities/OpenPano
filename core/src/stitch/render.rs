@@ -977,27 +977,43 @@ impl Accumulator {
         }
     }
 
+    /// Collapse the pyramid. Levels are consumed coarse to fine and normalised in place, so peak
+    /// memory is the finest level plus one upsampled buffer instead of several full copies.
     fn finish(self) -> RgbImage {
-        let norm = |lv: &Level| -> Vec<[f32; 3]> {
-            lv.c.par_iter()
-                .zip(lv.wsum.par_iter())
-                .map(|(c, &w)| if w > 1e-6 { [c[0] / w, c[1] / w, c[2] / w] } else { [0.0; 3] })
-                .collect()
-        };
-        if !self.multiband {
-            let data: Vec<[f32; 3]> = norm(&self.levels[0]).into_iter().map(|p| [p[0].max(0.0), p[1].max(0.0), p[2].max(0.0)]).collect();
-            return RgbImage { w: self.w, h: self.h, data };
+        fn normalise(lv: &mut Level) {
+            lv.c.par_iter_mut().zip(lv.wsum.par_iter()).for_each(|(c, &w)| {
+                *c = if w > 1e-6 { [c[0] / w, c[1] / w, c[2] / w] } else { [0.0; 3] };
+            });
+            lv.wsum = Vec::new();
         }
-        let nlev = self.levels.len() - 1;
-        let mut cur = norm(&self.levels[nlev]);
-        for l in (0..nlev).rev() {
-            let (cw, chh) = (self.levels[l + 1].w, self.levels[l + 1].h);
-            let (lw, lh) = (self.levels[l].w, self.levels[l].h);
-            let up = expand3(&cur, cw, chh, lw, lh);
-            let band = norm(&self.levels[l]);
-            cur = up.par_iter().zip(band.par_iter()).map(|(a, b)| [a[0] + b[0], a[1] + b[1], a[2] + b[2]]).collect();
+        fn clamp_neg(d: &mut [[f32; 3]]) {
+            d.par_iter_mut().for_each(|p| *p = [p[0].max(0.0), p[1].max(0.0), p[2].max(0.0)]);
         }
-        let data = cur.into_iter().map(|p| [p[0].max(0.0), p[1].max(0.0), p[2].max(0.0)]).collect();
-        RgbImage { w: self.w, h: self.h, data }
+        let (w, h, multiband) = (self.w, self.h, self.multiband);
+        let mut levels = self.levels;
+        if !multiband {
+            let mut lv = levels.swap_remove(0);
+            drop(levels);
+            normalise(&mut lv);
+            clamp_neg(&mut lv.c);
+            return RgbImage { w, h, data: lv.c };
+        }
+        let mut top = levels.pop().expect("pyramid");
+        normalise(&mut top);
+        let (mut cw, mut chh, mut cur) = (top.w, top.h, top.c);
+        while let Some(mut lv) = levels.pop() {
+            normalise(&mut lv);
+            let mut up = expand3(&cur, cw, chh, lv.w, lv.h);
+            drop(cur);
+            up.par_iter_mut().zip(lv.c.par_iter()).for_each(|(a, b)| {
+                a[0] += b[0];
+                a[1] += b[1];
+                a[2] += b[2];
+            });
+            (cw, chh) = (lv.w, lv.h);
+            cur = up;
+        }
+        clamp_neg(&mut cur);
+        RgbImage { w, h, data: cur }
     }
 }
