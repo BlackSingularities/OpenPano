@@ -40,7 +40,9 @@ pub fn load_raw(path: &Path, half: bool) -> Result<(RgbImage, RawInfo)> {
         full_w: raw.width.saturating_sub(raw.crops[1] + raw.crops[3]),
         full_h: raw.height.saturating_sub(raw.crops[0] + raw.crops[2]),
     };
-    let img = develop(&raw, half)?;
+    let is_dng = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("dng"));
+    let gm = if is_dng { crate::dng::gain_maps(path) } else { crate::dng::GainMaps::default() };
+    let img = develop(&raw, half, &gm)?;
     Ok((img, info))
 }
 
@@ -113,7 +115,8 @@ fn cam_to_srgb(raw: &RawImage) -> [[f32; 4]; 3] {
     m
 }
 
-pub fn develop(raw: &RawImage, half: bool) -> Result<RgbImage> {
+/// `gm`: DNG lens-shading gain maps applied to the normalised sensor data (may be empty).
+pub fn develop(raw: &RawImage, half: bool, gm: &crate::dng::GainMaps) -> Result<RgbImage> {
     let [ct, cr, cb, cl] = raw.crops;
     let (fw, fh) = (raw.width, raw.height);
     if cl + cr >= fw || ct + cb >= fh {
@@ -163,7 +166,10 @@ pub fn develop(raw: &RawImage, half: bool) -> Result<RgbImage> {
         for (x, v) in row.iter_mut().enumerate() {
             let c = cfa.color_at(y, x).min(3);
             let raw_v = get((y + ct) * fw + (x + cl));
-            let n = if float_data && raw.whitelevels[c] <= 1 { raw_v } else { (raw_v - black[c]) / range[c] };
+            let mut n = if float_data && raw.whitelevels[c] <= 1 { raw_v } else { (raw_v - black[c]) / range[c] };
+            if !gm.is_empty() {
+                n *= gm.gain((y + ct) as u32, (x + cl) as u32);
+            }
             *v = (n * wb[c]).clamp(0.0, 1.0);
         }
     });
