@@ -43,7 +43,7 @@ export interface RenderSettings {
 }
 
 export interface Settings {
-  lang: Lang;
+  lang: Lang | "auto";
   align: {
     lens: LensType;
     manual_hfov: number | null;
@@ -85,7 +85,7 @@ export const defaultRender = (): RenderSettings => ({
 });
 
 const defaults = (): Settings => ({
-  lang: "pl",
+  lang: "auto",
   align: { lens: "Rectilinear", manual_hfov: null, max_features: 2500, strategy: "Auto", window: 3, optimize_focal: true, straighten: true, ransac_threshold_px: 3 },
   manualFov: false,
   fovDeg: 60,
@@ -262,13 +262,11 @@ export async function init() {
   const saved = await invoke<any>("load_settings").catch(() => null);
   let s = defaults();
   if (saved) s = deepMerge(s, saved);
-  else s.lang = ((await invoke<string>("system_language").catch(() => "pl")) as Lang) ?? "pl";
   // a new session always starts with a neutral view
   Object.assign(s.render, { yaw: 0, pitch: 0, roll: 0, flip_h: false, flip_v: false, crop: s.render.crop === "Manual" ? "Auto" : s.render.crop });
   S.settings = s;
   setTheme(s.ui.theme, s.ui.customColor, false);
-  setLang(s.lang);
-  await invoke("set_language", { lang: s.lang });
+  await applyLang(s.lang);
 
   await listen<{ stage: string; fraction: number }>("progress", (e) => {
     if (app.job) {
@@ -312,10 +310,16 @@ export function setTheme(id: ThemeId, custom?: string, save = true) {
   if (save) persist();
 }
 
-export function setLanguage(l: Lang) {
+/** "auto" follows the system language (Windows locale / Android device language). */
+async function applyLang(l: Lang | "auto") {
+  const eff = l === "auto" ? (((await invoke<string>("system_language").catch(() => "en")) as Lang) ?? "en") : l;
+  setLang(eff);
+  await invoke("set_language", { lang: eff });
+}
+
+export function setLanguage(l: Lang | "auto") {
   S.settings.lang = l;
-  setLang(l);
-  invoke("set_language", { lang: l });
+  applyLang(l);
   persist();
 }
 

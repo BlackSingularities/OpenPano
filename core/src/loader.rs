@@ -153,7 +153,17 @@ pub struct Loaded {
 pub fn load(path: &Path, half: bool) -> Result<Loaded> {
     let mut meta = read_metadata(path);
     if raw::is_raw_path(path) {
-        let (img, info) = raw::load_raw(path, half).with_context(|| format!("{}", path.display()))?;
+        let (img, info) = match raw::load_raw(path, half) {
+            Ok(v) => v,
+            Err(e) => {
+                // Undecodable sensor data: fall back to the embedded camera preview.
+                let Some(prev) = raw::embedded_preview(path) else {
+                    return Err(e).with_context(|| format!("{}", path.display()));
+                };
+                let image = dynamic_to_linear(&prev).rotate_orientation(meta.orientation);
+                return Ok(Loaded { full_w: image.w, full_h: image.h, image, meta, is_raw: true });
+            }
+        };
         if meta.make.is_empty() {
             meta.make = info.make;
         }

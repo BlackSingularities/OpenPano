@@ -352,3 +352,31 @@ fn demosaic_generic(mosaic: &[f32], w: usize, h: usize, cfa: &CFA, m: &[[f32; 4]
     });
     out
 }
+
+/// Largest baseline JPEG embedded in a RAW/DNG container (camera preview). Used as a fallback
+/// when the sensor data cannot be decoded (e.g. lossy or JPEG XL compressed DNGs from phones).
+pub fn embedded_preview(path: &Path) -> Option<image::DynamicImage> {
+    use image::codecs::jpeg::JpegDecoder;
+    use image::ImageDecoder;
+    let bytes = std::fs::read(path).ok()?;
+    let mut best: Option<(usize, u64)> = None;
+    let mut tried = 0;
+    let mut i = 0;
+    while i + 3 < bytes.len() && tried < 256 {
+        if bytes[i] == 0xFF && bytes[i + 1] == 0xD8 && bytes[i + 2] == 0xFF {
+            tried += 1;
+            if let Ok(d) = JpegDecoder::new(std::io::Cursor::new(&bytes[i..])) {
+                let (w, h) = d.dimensions();
+                let px = w as u64 * h as u64;
+                if px >= 64 * 64 && best.map_or(true, |(_, b)| px > b) {
+                    best = Some((i, px));
+                }
+            }
+            i += 3;
+        } else {
+            i += 1;
+        }
+    }
+    let (pos, _) = best?;
+    image::load_from_memory_with_format(&bytes[pos..], image::ImageFormat::Jpeg).ok()
+}

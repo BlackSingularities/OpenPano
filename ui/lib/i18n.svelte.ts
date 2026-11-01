@@ -170,6 +170,7 @@ const D = {
   qNormal: ["Normalna", "Normal"],
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
+  langAuto: ["Auto", "Auto"],
   close: ["Zamknij", "Close"],
   ideaBy: ["Projekt i wykonanie", "Design and development"],
   coffee: ["Postaw kawę", "Buy me a coffee"],

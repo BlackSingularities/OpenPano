@@ -12,7 +12,7 @@
   import QualityBanner from "./components/QualityBanner.svelte";
   import UpdateBanner from "./components/UpdateBanner.svelte";
   import { upd, startUpdateChecks, checkForUpdate } from "./lib/updates.svelte";
-  import { t, getLang } from "./lib/i18n.svelte";
+  import { t } from "./lib/i18n.svelte";
   import { THEMES, type ThemeId } from "./lib/theme";
   import {
     S, app, vw, init, setLanguage, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
@@ -203,10 +203,6 @@
         <button class="btn blue" class:icon={compact} disabled={busyBlocking() || readyIds().length < 2} onclick={align} data-tip="Ctrl+Enter"><Icon name="align" size={16} />{#if !compact}{t("align")}{/if}</button>
         <button class="btn primary" class:icon={compact} disabled={!app.align || busyBlocking()} onclick={renderAndSave} data-tip="Ctrl+S"><Icon name="download" size={16} />{#if !compact}{t("export")}{/if}</button>
         {#if !compact}<div class="sep"></div>{/if}
-        <div class="seg lang">
-          <button class:on={getLang() === "pl"} onclick={() => setLanguage("pl")}>PL</button>
-          <button class:on={getLang() === "en"} onclick={() => setLanguage("en")}>EN</button>
-        </div>
         <div class="menuwrap">
           <button
             class="btn ghost icon"
@@ -248,6 +244,13 @@
                 {/if}
               </div>
               <div class="tname">{t(("theme_" + S.settings.ui.theme) as any)}</div>
+              <div class="dsep"></div>
+              <div class="dlabel">{t("language")}</div>
+              <div class="seg full q">
+                <button class:on={S.settings.lang === "auto"} onclick={() => setLanguage("auto")}>{t("langAuto")}</button>
+                <button class:on={S.settings.lang === "pl"} onclick={() => setLanguage("pl")}>Polski</button>
+                <button class:on={S.settings.lang === "en"} onclick={() => setLanguage("en")}>English</button>
+              </div>
               <div class="dsep"></div>
               <button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>
               <button onclick={() => ((menuOpen = false), (app.dialogs.log = true))}><Icon name="list" size={15} />{t("log")}</button>
@@ -661,11 +664,6 @@
     height: 24px;
     background: var(--line-2);
     margin: 0 2px;
-  }
-  .lang button {
-    font-weight: 600;
-    font-size: 11.5px;
-    padding: 0 9px;
   }
   .menuwrap {
     position: relative;
