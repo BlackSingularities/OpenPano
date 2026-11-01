@@ -58,7 +58,7 @@ export interface Settings {
   fovDeg: number;
   photo: { exposure: boolean; color: boolean; vignetting: boolean };
   render: RenderSettings;
-  output: { format: OutFormat; jpeg_quality: number; transparent: boolean; gpano: boolean };
+  output: { format: OutFormat; jpeg_quality: number; transparent: boolean; gpano: boolean; html_viewer: boolean };
   ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string; checkUpdates: boolean; skippedVersion: string };
 }
 
@@ -91,7 +91,7 @@ const defaults = (): Settings => ({
   fovDeg: 60,
   photo: { exposure: true, color: true, vignetting: true },
   render: { ...defaultRender(), max_megapixels: IS_MOBILE ? 60 : 300 },
-  output: { format: "Auto", jpeg_quality: 95, transparent: false, gpano: true },
+  output: { format: "Auto", jpeg_quality: 95, transparent: false, gpano: true, html_viewer: false },
   ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44", checkUpdates: true, skippedVersion: "" },
 });
 

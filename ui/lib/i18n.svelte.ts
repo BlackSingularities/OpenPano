@@ -104,6 +104,8 @@ const D = {
   gpano: ["Metadane 360° (GPano)", "360° metadata (GPano)"],
   gpanoHint: ["Google Photos, Facebook i przeglądarki VR rozpoznają zdjęcie jako panoramę sferyczną.", "Google Photos, Facebook and VR viewers recognise the image as a spherical panorama."],
   revealAfter: ["Pokaż plik po zapisaniu", "Reveal file after saving"],
+  htmlViewer: ["Przeglądarka HTML 360°", "HTML 360° viewer"],
+  h_htmlViewer: ["Obok pliku JPEG zapisuje stronę HTML z interaktywną przeglądarką panoramy (Pannellum). Wystarczy wgrać oba pliki na serwer.", "Writes an HTML page with an interactive panorama viewer (Pannellum) next to the JPEG. Upload both files to a web server."],
   outputSize: ["Wynik", "Output"],
   // viewer
   toolRotate: ["Obracaj", "Rotate"],

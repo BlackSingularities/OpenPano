@@ -53,11 +53,13 @@ pub struct OutputSettings {
     pub jpeg_quality: u8,
     pub transparent: bool,
     pub gpano: bool,
+    /// Also write a self-contained HTML 360° viewer next to an equirectangular JPEG.
+    pub html_viewer: bool,
 }
 
 impl Default for OutputSettings {
     fn default() -> Self {
-        Self { format: OutputFormat::Auto, jpeg_quality: 95, transparent: false, gpano: true }
+        Self { format: OutputFormat::Auto, jpeg_quality: 95, transparent: false, gpano: true, html_viewer: false }
     }
 }
 
@@ -114,11 +116,59 @@ pub fn save(path: &Path, out: &RenderOutput, fmt: OutputFormat, st: &OutputSetti
     let xmp = if st.gpano { gpano_xmp(out) } else { None };
     let alpha = if st.transparent && out.alpha.iter().any(|a| *a == 0) { Some(out.alpha.as_slice()) } else { None };
     match fmt {
-        OutputFormat::Auto | OutputFormat::Jpeg => save_jpeg(path, &out.image, st.jpeg_quality, xmp.as_deref()),
+        OutputFormat::Auto | OutputFormat::Jpeg => {
+            save_jpeg(path, &out.image, st.jpeg_quality, xmp.as_deref())?;
+            if st.html_viewer {
+                save_html_viewer(path, out)?;
+            }
+            Ok(())
+        }
         OutputFormat::Png16 => save_16(path, &out.image, alpha, image::ImageFormat::Png),
         OutputFormat::Tiff16 => save_16(path, &out.image, alpha, image::ImageFormat::Tiff),
         OutputFormat::Dng => save_dng(path, &out.image, info, xmp.as_deref()),
     }
+}
+
+/// Write `<name>.html` with a Pannellum viewer showing the JPEG at `path` (equirectangular only).
+pub fn save_html_viewer(path: &Path, out: &RenderOutput) -> Result<()> {
+    let c = &out.canvas;
+    if c.proj != Projection::Equirectangular {
+        return Ok(());
+    }
+    let deg = 180.0 / (std::f64::consts::PI * c.scale);
+    let haov = (out.image.w as f64 * deg).min(360.0);
+    let vaov = (out.image.h as f64 * deg).min(180.0);
+    // vertical centre of the image relative to the horizon (positive = above)
+    let top = (c.v0 + std::f64::consts::FRAC_PI_2) * c.scale + out.crop.1 as f64;
+    let voff = 90.0 - (top + out.image.h as f64 / 2.0) * deg;
+    let name = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let title = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let esc = |s: &str| s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;");
+    let js = |s: &str| -> String { let mut o = String::from('"'); for ch in s.chars() { match ch { '\\' | '"' => { o.push('\\'); o.push(ch) } '<' => o.push_str("\\x3c"), c => o.push(c) } } o.push('"'); o };
+    let html = format!(
+        concat!(
+            "<!doctype html><html><head><meta charset=\"utf-8\">",
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">",
+            "<title>{title}</title>",
+            "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css\">",
+            "<script src=\"https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js\"></script>",
+            "<style>html,body,#p{{margin:0;width:100%;height:100%;background:#000}}</style></head><body><div id=\"p\"></div>",
+            "<script>pannellum.viewer('p',{{type:'equirectangular',panorama:{img},autoLoad:true,",
+            "haov:{haov:.4},vaov:{vaov:.4},vOffset:{voff:.4},minYaw:{miny:.4},maxYaw:{maxy:.4},title:{jt}}});</script>",
+            "</body></html>"
+        ),
+        title = esc(&title),
+        img = js(&name),
+        jt = js(&title),
+        haov = haov,
+        vaov = vaov,
+        voff = voff,
+        miny = if haov >= 359.9 { -180.0 } else { -haov / 2.0 },
+        maxy = if haov >= 359.9 { 180.0 } else { haov / 2.0 },
+    );
+    let hp = path.with_extension("html");
+    std::fs::write(&hp, html).with_context(|| format!("{}", hp.display()))?;
+    Ok(())
 }
 
 pub fn to_srgb8(img: &RgbImage) -> Vec<u8> {
