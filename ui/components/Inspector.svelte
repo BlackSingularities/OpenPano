@@ -175,6 +175,7 @@
       {/if}
       {#if effectiveProjection() === "Equirectangular"}
         <Switch label={t("gpano")} tip={t("h_gpano")} bind:checked={s.output.gpano} onchange={persist} />
+        <Switch label={t("fillPoles")} tip={t("h_fillPoles")} bind:checked={s.output.fill_poles} onchange={persist} />
         {#if resolvedFormat() === "Jpeg"}
           <Switch label={t("htmlViewer")} tip={t("h_htmlViewer")} bind:checked={s.output.html_viewer} onchange={persist} />
         {/if}

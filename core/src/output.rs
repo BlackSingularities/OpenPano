@@ -58,11 +58,13 @@ pub struct OutputSettings {
     pub gpano: bool,
     /// Also write a self-contained HTML 360° viewer next to an equirectangular JPEG.
     pub html_viewer: bool,
+    /// Fill uncovered zenith / nadir caps of an equirectangular result with a smooth patch.
+    pub fill_poles: bool,
 }
 
 impl Default for OutputSettings {
     fn default() -> Self {
-        Self { format: OutputFormat::Auto, jpeg_quality: 95, transparent: false, gpano: true, html_viewer: false }
+        Self { format: OutputFormat::Auto, jpeg_quality: 95, transparent: false, gpano: true, html_viewer: false, fill_poles: false }
     }
 }
 
@@ -173,6 +175,96 @@ pub fn save_html_viewer(path: &Path, out: &RenderOutput) -> Result<()> {
     let hp = path.with_extension("html");
     std::fs::write(&hp, html).with_context(|| format!("{}", hp.display()))?;
     Ok(())
+}
+
+/// Patch the uncovered top and bottom of an equirectangular image: each column continues the
+/// colour of its last covered pixel, fading towards the mean ring colour at the pole, so the
+/// tripod hole / missing sky becomes an unobtrusive gradient.
+pub fn fill_poles(out: &mut RenderOutput) {
+    if out.canvas.proj != Projection::Equirectangular {
+        return;
+    }
+    let (w, h) = (out.image.w, out.image.h);
+    if w < 4 || h < 4 {
+        return;
+    }
+    for top in [true, false] {
+        // first covered row per column, scanning from the pole
+        let edge: Vec<Option<usize>> = (0..w)
+            .map(|x| {
+                let rows: Box<dyn Iterator<Item = usize>> = if top { Box::new(0..h) } else { Box::new((0..h).rev()) };
+                rows.take(h / 2).find(|&y| out.alpha[y * w + x] > 0)
+            })
+            .collect();
+        if edge.iter().all(|e| matches!(e, Some(y) if (top && *y == 0) || (!top && *y == h - 1))) {
+            continue;
+        }
+        let valid: Vec<usize> = (0..w).filter(|&x| edge[x].is_some()).collect();
+        if valid.is_empty() {
+            continue;
+        }
+        // colour at the edge (a few rows deep), then circular box blur along x
+        let mut col = vec![[0f32; 3]; w];
+        let mut has = vec![false; w];
+        for &x in &valid {
+            let y0 = edge[x].unwrap();
+            let mut acc = [0f32; 3];
+            let mut n = 0.0;
+            for k in 0..4 {
+                let y = if top { y0 + k } else { y0.saturating_sub(k) };
+                if y < h && out.alpha[y * w + x] > 0 {
+                    let p = out.image.data[y * w + x];
+                    for c in 0..3 {
+                        acc[c] += p[c];
+                    }
+                    n += 1.0;
+                }
+            }
+            if n > 0.0 {
+                col[x] = [acc[0] / n, acc[1] / n, acc[2] / n];
+                has[x] = true;
+            }
+        }
+        let mut mean = [0f32; 3];
+        let cnt = has.iter().filter(|v| **v).count().max(1) as f32;
+        for x in 0..w {
+            if has[x] {
+                for c in 0..3 {
+                    mean[c] += col[x][c] / cnt;
+                }
+            }
+        }
+        let r = (w / 64).max(2) as isize;
+        let blurred: Vec<[f32; 3]> = (0..w as isize)
+            .map(|x| {
+                let mut acc = [0f32; 3];
+                let mut n = 0.0;
+                for d in -r..=r {
+                    let xx = (x + d).rem_euclid(w as isize) as usize;
+                    if has[xx] {
+                        for c in 0..3 {
+                            acc[c] += col[xx][c];
+                        }
+                        n += 1.0;
+                    }
+                }
+                if n > 0.0 { [acc[0] / n, acc[1] / n, acc[2] / n] } else { mean }
+            })
+            .collect();
+        let deepest = edge.iter().map(|e| e.map(|y| if top { y } else { h - 1 - y }).unwrap_or(h / 2)).max().unwrap_or(0).max(1);
+        for x in 0..w {
+            let depth = edge[x].map(|y| if top { y } else { h - 1 - y }).unwrap_or(h / 2);
+            for k in 0..depth {
+                let y = if top { k } else { h - 1 - k };
+                // 0 at the covered edge, 1 at the pole
+                let t = ((depth - k) as f32 / deepest as f32).clamp(0.0, 1.0);
+                let t = t * t * (3.0 - 2.0 * t);
+                let b = blurred[x];
+                out.image.data[y * w + x] = [b[0] + (mean[0] - b[0]) * t, b[1] + (mean[1] - b[1]) * t, b[2] + (mean[2] - b[2]) * t];
+                out.alpha[y * w + x] = 255;
+            }
+        }
+    }
 }
 
 pub fn to_srgb8(img: &RgbImage) -> Vec<u8> {

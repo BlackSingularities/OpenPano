@@ -173,6 +173,8 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   langAuto: ["Auto", "Auto"],
+  fillPoles: ["Załataj nadir i zenit", "Patch nadir & zenith"],
+  h_fillPoles: ["Wypełnia brakujące niebo i miejsce po statywie płynnym przejściem kolorów z krawędzi panoramy.", "Fills the missing sky and tripod hole with a smooth colour gradient from the panorama edge."],
   qParallax: ["prawdopodobna paralaksa – obracaj aparat wokół punktu nodalnego obiektywu", "likely parallax – rotate the camera around the lens nodal point"],
   projectOpen: ["Otwórz projekt…", "Open project…"],
   projectSave: ["Zapisz projekt…", "Save project…"],

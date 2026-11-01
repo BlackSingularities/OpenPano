@@ -807,8 +807,11 @@ pub async fn render_and_save(app: AppHandle, state: State<'_, Shared>, path: Str
     let t0 = std::time::Instant::now();
     let path2 = PathBuf::from(&path);
     let r = tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize, usize), StitchError> {
-        let out = project::render_full(&works, &al, &render, &progress, &cancel)?;
+        let mut out = project::render_full(&works, &al, &render, &progress, &cancel)?;
         progress.set_stage(openpano_core::i18n::tr(openpano_core::i18n::Key::StageSaving));
+        if output.fill_poles {
+            openpano_core::output::fill_poles(&mut out);
+        }
         let fmt = project::save_output(&path2, &out, &works, &output)?;
         Ok((format!("{:?}", fmt), out.image.w, out.image.h))
     })
