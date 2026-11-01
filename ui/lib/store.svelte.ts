@@ -56,7 +56,7 @@ export interface Settings {
   };
   manualFov: boolean;
   fovDeg: number;
-  photo: { exposure: boolean; color: boolean; vignetting: boolean };
+  photo: { exposure: boolean; color: boolean; vignetting: boolean; ev: number; temperature: number; tint: number };
   render: RenderSettings;
   output: { format: OutFormat; jpeg_quality: number; transparent: boolean; gpano: boolean; html_viewer: boolean; fill_poles: boolean };
   ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string; checkUpdates: boolean; skippedVersion: string; onboarded: boolean };
@@ -89,7 +89,7 @@ const defaults = (): Settings => ({
   align: { lens: "Rectilinear", manual_hfov: null, max_features: 2500, strategy: "Auto", window: 3, optimize_focal: true, straighten: true, ransac_threshold_px: 3 },
   manualFov: false,
   fovDeg: 60,
-  photo: { exposure: true, color: true, vignetting: true },
+  photo: { exposure: true, color: true, vignetting: true, ev: 0, temperature: 0, tint: 0 },
   render: { ...defaultRender(), max_megapixels: IS_MOBILE ? 60 : 300 },
   output: { format: "Auto", jpeg_quality: 95, transparent: false, gpano: true, html_viewer: false, fill_poles: false },
   ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44", checkUpdates: true, skippedVersion: "", onboarded: false },

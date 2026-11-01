@@ -111,6 +111,9 @@
       <Switch label={t("exposure")} tip={t("h_exposure")} bind:checked={s.photo.exposure} onchange={setPhotometric} />
       <Switch label={t("color")} tip={t("h_color")} bind:checked={s.photo.color} onchange={setPhotometric} />
       <Switch label={t("vignetting")} tip={t("h_vignetting")} bind:checked={s.photo.vignetting} onchange={setPhotometric} />
+      <Slider label={t("ev")} tip={t("h_ev")} bind:value={s.photo.ev} min={-3} max={3} step={0.1} unit=" EV" oncommit={setPhotometric} />
+      <Slider label={t("temperature")} tip={t("h_temperature")} bind:value={s.photo.temperature} min={-100} max={100} step={1} oncommit={setPhotometric} />
+      <Slider label={t("tint")} tip={t("h_tint")} bind:value={s.photo.tint} min={-100} max={100} step={1} oncommit={setPhotometric} />
       <Switch label={t("bicubic")} tip={t("h_bicubic")} bind:checked={r.bicubic} onchange={persist} />
     </Section>
 

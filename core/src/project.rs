@@ -62,12 +62,33 @@ pub struct PhotoOptions {
     pub exposure: bool,
     pub color: bool,
     pub vignetting: bool,
+    /// Global exposure compensation in EV.
+    pub ev: f32,
+    /// White balance shifts, -100..100 (warmer / more magenta when positive).
+    pub temperature: f32,
+    pub tint: f32,
 }
 
 impl Default for PhotoOptions {
     fn default() -> Self {
-        Self { exposure: true, color: true, vignetting: true }
+        Self { exposure: true, color: true, vignetting: true, ev: 0.0, temperature: 0.0, tint: 0.0 }
     }
+}
+
+/// Fold the global exposure / white balance adjustment into every image gain.
+fn apply_global(mut p: Photometric, ph: &PhotoOptions) -> Photometric {
+    let e = 2f32.powf(ph.ev.clamp(-5.0, 5.0));
+    let t = 2f32.powf(ph.temperature.clamp(-100.0, 100.0) / 200.0);
+    let m = 2f32.powf(-ph.tint.clamp(-100.0, 100.0) / 200.0);
+    if e == 1.0 && t == 1.0 && m == 1.0 {
+        return p;
+    }
+    for g in p.gains.iter_mut() {
+        g[0] *= e * t;
+        g[1] *= e * m;
+        g[2] *= e / t;
+    }
+    p
 }
 
 pub struct Aligned {
@@ -128,11 +149,9 @@ pub fn run_align_diag(
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StagePhotometric));
     let work: Vec<RgbImage> = works.iter().map(|w| w.img.clone()).collect();
     let scales: Vec<f64> = works.iter().map(|w| w.scale).collect();
-    let photo = photometric::estimate(
-        &alignment,
-        &work,
-        &scales,
-        &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting },
+    let photo = apply_global(
+        photometric::estimate(&alignment, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting }),
+        ph,
     );
     Ok(Aligned { alignment, photo })
 }
@@ -141,7 +160,7 @@ pub fn run_align_diag(
 pub fn recompute_photo(works: &[Arc<WorkImage>], al: &Alignment, ph: &PhotoOptions) -> Photometric {
     let work: Vec<RgbImage> = works.iter().map(|w| w.img.clone()).collect();
     let scales: Vec<f64> = works.iter().map(|w| w.scale).collect();
-    photometric::estimate(al, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting })
+    apply_global(photometric::estimate(al, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting }), ph)
 }
 
 /// Render the blended panorama from the working images into an equirectangular map of about
