@@ -418,7 +418,7 @@ mod tests {
         let prev = embedded_preview(&p).expect("preview");
         assert_eq!((prev.width(), prev.height()), (320, 200));
         let t = preview_thumb(&p, 160, 6).expect("thumb");
-        assert_eq!(t.width(), 100); // rotated 90°: 200x320 -> 100x160
+        assert_eq!((t.width(), t.height()), (160, 256)); // rotated 90°: 200x320 -> 160x256
         let _ = std::fs::remove_dir_all(&dir);
     }
 
