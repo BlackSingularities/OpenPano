@@ -80,13 +80,15 @@ fn begin_job(app: &AppHandle, st: &Shared, stage: &str) -> (Progress, Cancel, Ar
 
 #[tauri::command]
 pub fn set_language(lang: String) {
-    if let Some(l) = Lang::from_code(&lang) {
-        i18n::set_lang(l);
-    }
+    // Engine messages exist in Polish and English; other UI languages use English ones.
+    i18n::set_lang(Lang::from_code(&lang).unwrap_or(Lang::En));
 }
 
 #[tauri::command]
 pub fn system_language() -> String {
+    if sys_locale::get_locale().is_some_and(|l| l.to_ascii_lowercase().starts_with("de")) {
+        return "de".into();
+    }
     match Lang::detect() {
         Lang::Pl => "pl".into(),
         Lang::En => "en".into(),

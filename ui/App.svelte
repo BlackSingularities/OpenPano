@@ -284,6 +284,7 @@
                 <button class:on={S.settings.lang === "auto"} onclick={() => setLanguage("auto")}>{t("langAuto")}</button>
                 <button class:on={S.settings.lang === "pl"} onclick={() => setLanguage("pl")}>Polski</button>
                 <button class:on={S.settings.lang === "en"} onclick={() => setLanguage("en")}>English</button>
+                <button class:on={S.settings.lang === "de"} onclick={() => setLanguage("de")}>Deutsch</button>
               </div>
               <div class="dsep"></div>
               <button onclick={() => ((menuOpen = false), (app.dialogs.welcome = true))}><Icon name="info" size={15} />{t("welcomeMenu")}</button>

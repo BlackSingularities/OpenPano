@@ -1,6 +1,8 @@
 import type { Projection, LensType } from "./geometry";
 
-export type Lang = "pl" | "en";
+import { DE, DE_PROJ, DE_LENS } from "./i18n.de";
+
+export type Lang = "pl" | "en" | "de";
 
 const D = {
   appTagline: ["Profesjonalne panoramy", "Professional panoramas"],
@@ -422,11 +424,13 @@ export function getLang(): Lang {
   return L.lang;
 }
 export function t(k: TKey): string {
+  if (L.lang === "de") return DE[k] ?? D[k][1];
   return D[k][L.lang === "pl" ? 0 : 1];
 }
 
 /** "n punkt/punkty/punktów" – Polish plural forms; English uses one/other. */
 export function countPoints(n: number): string {
+  if (L.lang === "de") return `${n} ${n === 1 ? "Punkt" : "Punkte"}`;
   if (L.lang !== "pl") return `${n} ${n === 1 ? "point" : "points"}`;
   const d = n % 10, h = n % 100;
   const w = n === 1 ? "punkt" : d >= 2 && d <= 4 && (h < 12 || h > 14) ? "punkty" : "punktów";
@@ -448,9 +452,11 @@ const PROJ: Record<Projection, [string, string, string, string]> = {
 };
 
 export function projName(p: Projection): string {
+  if (L.lang === "de") return DE_PROJ[p]?.[0] ?? PROJ[p][1];
   return PROJ[p][L.lang === "pl" ? 0 : 1];
 }
 export function projDesc(p: Projection): string {
+  if (L.lang === "de") return DE_PROJ[p]?.[1] ?? PROJ[p][3];
   return PROJ[p][L.lang === "pl" ? 2 : 3];
 }
 
@@ -461,5 +467,6 @@ const LENS: Record<LensType, [string, string]> = {
   FisheyeStereographic: ["Rybie oko – stereograficzne", "Fisheye – stereographic"],
 };
 export function lensName(l: LensType): string {
+  if (L.lang === "de") return DE_LENS[l] ?? LENS[l][1];
   return LENS[l][L.lang === "pl" ? 0 : 1];
 }
