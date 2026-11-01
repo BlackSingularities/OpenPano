@@ -173,6 +173,7 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   langAuto: ["Auto", "Auto"],
+  gyro: ["Rozglądaj się, obracając telefon", "Look around by moving the phone"],
   batchMenu: ["Renderuj wsadowo wg czasu", "Batch render by time"],
   batchPickDir: ["Folder na panoramy", "Folder for panoramas"],
   batchNone: ["Nie znaleziono grup zdjęć (min. 2 zdjęcia w odstępach do 30 s)", "No image groups found (at least 2 shots up to 30 s apart)"],

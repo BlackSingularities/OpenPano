@@ -6,7 +6,38 @@
   import { wraps, forward, inverse, lensRay, level, largestRect, mul, solveGrab, transpose, ypr, yawPitchTowards, type V3 } from "../lib/geometry";
   import { t } from "../lib/i18n.svelte";
   import { canvasBg } from "../lib/theme";
-  import { themeState, S, app, vw, fitView, viewChanged, commitHistory, undo, redo, canUndo, canRedo, persist, centreOn, applyLevel, currentKind, lookOffsets, type Tool } from "../lib/store.svelte";
+  import { themeState, S, app, vw, fitView, viewChanged, commitHistory, undo, redo, canUndo, canRedo, persist, centreOn, applyLevel, currentKind, lookOffsets, IS_MOBILE, type Tool } from "../lib/store.svelte";
+
+  // Gyroscope look-around (phones): device rotation drives yaw / pitch relative to where it started.
+  let gyro = $state(false);
+  let gyro0: { a: number; b: number; yaw: number; pitch: number } | null = null;
+  function onOrient(e: DeviceOrientationEvent) {
+    if (e.alpha == null || e.beta == null) return;
+    if (!gyro0) {
+      gyro0 = { a: e.alpha, b: e.beta, yaw: S.settings.render.yaw, pitch: S.settings.render.pitch };
+      return;
+    }
+    const da = ((((gyro0.a - e.alpha) + 540) % 360) - 180);
+    const r = S.settings.render;
+    r.yaw = ((((gyro0.yaw + da + 180) % 360) + 360) % 360) - 180;
+    r.pitch = Math.max(-90, Math.min(90, gyro0.pitch + (e.beta - gyro0.b)));
+  }
+  async function toggleGyro() {
+    if (gyro) {
+      window.removeEventListener("deviceorientation", onOrient);
+      gyro = false;
+      gyro0 = null;
+      commitHistory();
+      viewChanged();
+      return;
+    }
+    const D = DeviceOrientationEvent as any;
+    if (typeof D?.requestPermission === "function" && (await D.requestPermission().catch(() => "denied")) !== "granted") return;
+    gyro0 = null;
+    window.addEventListener("deviceorientation", onOrient);
+    gyro = true;
+  }
+  onMount(() => () => window.removeEventListener("deviceorientation", onOrient));
 
   let host: HTMLDivElement;
   let canvas: HTMLCanvasElement;
@@ -569,6 +600,9 @@
     <div class="grow"></div>
     <button class="btn ghost icon" class:active={S.settings.ui.showGrid} data-tip={t("gridHint")} aria-label={t("gridHint")} onclick={() => ((S.settings.ui.showGrid = !S.settings.ui.showGrid), persist())}><Icon name="grid" size={17} /></button>
     <button class="btn ghost icon" class:active={S.settings.ui.showOutlines} data-tip={t("outlinesHint")} aria-label={t("outlinesHint")} onclick={() => ((S.settings.ui.showOutlines = !S.settings.ui.showOutlines), persist())}><Icon name="outlines" size={17} /></button>
+    {#if IS_MOBILE && typeof DeviceOrientationEvent !== "undefined"}
+      <button class="btn ghost icon" class:active={gyro} data-tip={t("gyro")} aria-label={t("gyro")} aria-pressed={gyro} onclick={toggleGyro}><Icon name="sphere" size={17} /></button>
+    {/if}
     <button class="btn ghost icon" class:active={S.settings.ui.showNav} data-tip={t("navPad")} aria-label={t("navPad")} onclick={() => ((S.settings.ui.showNav = !S.settings.ui.showNav), persist())}><Icon name="compass" size={17} /></button>
     <div class="sep"></div>
     <button class="btn ghost icon" data-tip={t("zoomOut")} aria-label={t("zoomOut")} onclick={() => (vw.zoom = Math.max(0.2, vw.zoom / 1.25))}><Icon name="zoomOut" size={17} /></button>
