@@ -257,7 +257,7 @@ pub fn align_with_diag(
 
     // ---------- focal lengths ----------
     let mut focal = vec![0f64; n];
-    let mut source = FocalSource::Default;
+    let source;
     if let Some(hfov) = st.manual_hfov {
         for (k, im) in imgs.iter().enumerate() {
             focal[k] = st.lens.focal_from_hfov(hfov, im.full_w as f64);
