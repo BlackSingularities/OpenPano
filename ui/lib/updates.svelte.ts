@@ -1,6 +1,5 @@
 // Update check against the release feed on redzikowski.com (GitHub-shaped, the repo is private)
 // – works the same on desktop, Android and iOS; plain fetch from the webview, the feed allows CORS.
-import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -34,7 +33,7 @@ async function assetPattern(): Promise<RegExp | null> {
   const ua = navigator.userAgent;
   if (/android/i.test(ua)) return /android\.apk$/i;
   if (/iphone|ipad|ipod/i.test(ua)) return null; // sideloaded IPA – release page is the right place
-  if (/windows/i.test(ua)) return (await invoke<boolean>("portable_build").catch(() => false)) ? /portable-x64\.exe$/i : /setup-x64\.exe$/i;
+  if (/windows/i.test(ua)) return /setup-x64\.exe$/i;
   return null;
 }
 

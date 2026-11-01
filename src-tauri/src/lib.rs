@@ -37,7 +37,6 @@ pub fn run() {
             commands::predict_point,
             startup_files,
             auto_align_flag,
-            portable_build,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OpenPano");
@@ -54,15 +53,4 @@ fn startup_files(state: tauri::State<'_, StartupFiles>) -> Vec<String> {
 #[tauri::command]
 fn auto_align_flag() -> bool {
     std::env::var_os("OPENPANO_AUTOALIGN").is_some()
-}
-
-/// True for the portable Windows exe (the NSIS installer puts uninstall.exe next to it),
-/// so the update notice can offer the matching download.
-#[tauri::command]
-fn portable_build() -> bool {
-    cfg!(windows)
-        && std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| !d.join("uninstall.exe").exists()))
-            .unwrap_or(false)
 }

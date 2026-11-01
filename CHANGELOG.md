@@ -1,3 +1,14 @@
+## 2.3.0
+
+- Windows: wydawany jest tylko instalator (bez wersji portable). Instaluje się dla wszystkich użytkowników w Program Files (z prośbą o uprawnienia administratora), a aktualizacja trafia zawsze w to samo miejsce; dawna instalacja w profilu użytkownika jest usuwana.
+- Instalator: pełne polskie tłumaczenie (koniec z pustymi etykietami).
+- Fuzja ekspozycji dla bracketingu, globalna ekspozycja/temperatura/odcień, łatanie nadiru i zenitu.
+- Eksport EXR 32-bit, przeglądarka HTML 360° obok JPEG, ostrzeżenie o paralaksie i o braku pamięci przed renderem.
+- Render wsadowy z grupowaniem wg czasu EXIF, projekty, eksport dziennika, onboarding, postęp na pasku zadań.
+- RAW/DNG: szybka miniatura z podglądu osadzonego, korekcja cieniowania obiektywu (GainMap), opcjonalny dekoder rawler.
+- Podgląd: rozglądanie żyroskopem na telefonie; Android: Panoramer w menu Udostępnij / Otwórz za pomocą.
+- Język niemiecki, etykiety ARIA, mniejsze zużycie RAM przy składaniu piramidy.
+
 ## 2.2.2 — Author credit and support button
 
 ## 2.2.4

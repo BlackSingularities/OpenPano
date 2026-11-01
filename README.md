@@ -44,7 +44,7 @@ OpenPano łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne,
 
 ### Instalacja
 Pobierz z [Releases](https://github.com/BlackSingularities/OpenPano/releases/latest):
-- **Windows:** `OpenPano-x.y.z-setup-x64.exe` (instalator PL/EN) lub `…-portable-x64.exe` (bez instalacji),
+- **Windows:** `OpenPano-x.y.z-setup-x64.exe` (instalator PL/EN; aktualizacja instaluje się w tym samym miejscu, w Program Files),
 - **Android:** `OpenPano-x.y.z-android.apk` (Android 8.0+). Otwórz plik i zezwól na instalację z tego źródła,
 - **iOS:** `OpenPano-x.y.z-ios-unsigned.ipa`. Plik nie jest podpisany (wymaga to konta Apple Developer); zainstaluj go przez AltStore lub Sideloadly, które podpiszą go Twoim Apple ID.
 
@@ -89,7 +89,7 @@ Requirements: Rust, Node.js 22.
 npm ci
 npx tauri build
 ```
-Releases are built by GitHub Actions: pushing a `v*` tag produces the NSIS installer (Polish/English) and the portable build.
+Releases are built by GitHub Actions: pushing a `v*` tag produces the NSIS installer (Polish/English, per-machine install).
 
 ## License
 GPL-3.0-or-later.
