@@ -38,7 +38,7 @@ export interface RenderSettings {
   level_roll: number;
   circular_fisheye: boolean;
   bicubic: boolean;
-  exposure_fusion?: boolean;
+  exposure_fusion: boolean;
   priority?: boolean[];
   flip_h: boolean;
   flip_v: boolean;

@@ -491,7 +491,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="modal-bg" onclick={closeWelcome}>
-      <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="welcome-title" onclick={(e) => e.stopPropagation()}>
+      <div class="modal wide" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="welcome-title" onclick={(e) => e.stopPropagation()}>
         <h3 id="welcome-title"><Icon name="info" size={18} />{t("tipsTitle")}</h3>
         <ol class="tips">
           <li>{t("tip1")}</li>
