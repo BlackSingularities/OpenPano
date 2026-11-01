@@ -175,6 +175,8 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   langAuto: ["Auto", "Auto"],
+  memWarn: ["Za mało pamięci na ten rozmiar – zmniejsz rozdzielczość lub limit MP", "Not enough memory for this size – lower the resolution or MP limit"],
+  memRenderAnyway: ["Renderuj mimo to", "Render anyway"],
   prefer: ["Preferuj to zdjęcie na zakładkach", "Prefer this image in overlaps"],
   unprefer: ["Przestań preferować", "Stop preferring"],
   preferredTag: ["Preferowane", "Preferred"],

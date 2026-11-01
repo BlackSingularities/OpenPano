@@ -165,6 +165,8 @@ export const DE: Record<string, string> = {
   qHigh: "Hoch",
   language: "Sprache",
   langAuto: "Auto",
+  memWarn: "Zu wenig Speicher für diese Größe – Auflösung oder MP-Limit verringern",
+  memRenderAnyway: "Trotzdem rendern",
   prefer: "Dieses Bild in Überlappungen bevorzugen",
   unprefer: "Nicht mehr bevorzugen",
   preferredTag: "Bevorzugt",

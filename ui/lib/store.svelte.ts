@@ -749,8 +749,26 @@ export function hasUnsavedWork(): boolean {
   return app.exportedSnapshot !== viewSnapshot();
 }
 
+/** Estimated render RAM (GB) vs. what the device reports; null when unknown. */
+export function memoryRisk(): { need: number; have: number } | null {
+  const L = app.layout;
+  const have = (navigator as any).deviceMemory as number | undefined;
+  if (!L || !have) return null;
+  const need = ((L.outW * L.outH) / 1e6) * 40 / 1024;
+  // deviceMemory is capped at 8 GB, so only warn when the estimate clearly exceeds it
+  return need > have * (have >= 8 ? 2 : 0.7) ? { need, have } : null;
+}
+
+let memoryConfirmed = "";
+
 export async function renderAndSave() {
   if (!app.align || busyBlocking()) return;
+  const risk = memoryRisk();
+  const key = viewSnapshot();
+  if (risk && memoryConfirmed !== key) {
+    toast(`${t("memWarn")} (~${risk.need.toFixed(1)} GB / ${risk.have} GB)`, "error", { label: t("memRenderAnyway"), run: () => ((memoryConfirmed = key), renderAndSave()) });
+    return;
+  }
   const fmt = resolvedFormat();
   const first = app.images.find((x) => x.id === app.alignedIds[0]);
   const base = first ? first.name.replace(/\.[^.]+$/, "") + "_pano" : "panorama";

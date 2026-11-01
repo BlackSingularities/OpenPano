@@ -7,7 +7,7 @@
   import Composition from "./Composition.svelte";
   import { t, lensName } from "../lib/i18n.svelte";
   import type { LensType } from "../lib/geometry";
-  import { S, app, vw, align, busyBlocking, readyIds, persist, viewChanged, buildSphere, setPhotometric, renderAndSave, resolvedFormat, anyRaw, effectiveProjection, commitHistory } from "../lib/store.svelte";
+  import { S, app, vw, align, busyBlocking, readyIds, persist, viewChanged, buildSphere, setPhotometric, renderAndSave, resolvedFormat, memoryRisk, anyRaw, effectiveProjection, commitHistory } from "../lib/store.svelte";
 
   const s = $derived(S.settings);
   const r = $derived(S.settings.render);
@@ -189,7 +189,7 @@
         <div class="out" data-tip={t("h_outSize")}>
           <div><span>{t("outputSize")}</span><b>{outSize.w} × {outSize.h}</b></div>
           <div><span>MP</span><b>{outSize.mp.toFixed(1)}</b></div>
-          <div><span>RAM</span><b>~{outSize.ram.toFixed(1)} GB</b></div>
+          <div class:memrisk={!!memoryRisk()}><span>RAM</span><b>~{outSize.ram.toFixed(1)} GB</b></div>
         </div>
       {/if}
       <button data-tip={t("h_render")} class="btn primary lg wide" disabled={!app.align || busyBlocking()} onclick={renderAndSave}>
@@ -226,6 +226,9 @@
     grid-template-columns: 1.4fr 0.8fr 0.9fr;
   }
   .stats div,
+  .memrisk b {
+    color: var(--err);
+  }
   .out div {
     display: flex;
     flex-direction: column;
