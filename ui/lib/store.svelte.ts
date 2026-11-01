@@ -59,7 +59,7 @@ export interface Settings {
   photo: { exposure: boolean; color: boolean; vignetting: boolean };
   render: RenderSettings;
   output: { format: OutFormat; jpeg_quality: number; transparent: boolean; gpano: boolean; html_viewer: boolean };
-  ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string; checkUpdates: boolean; skippedVersion: string };
+  ui: { showGrid: boolean; showOutlines: boolean; showNav: boolean; quality: "fast" | "normal" | "high"; revealAfter: boolean; theme: ThemeId; customColor: string; checkUpdates: boolean; skippedVersion: string; onboarded: boolean };
 }
 
 export const defaultRender = (): RenderSettings => ({
@@ -92,7 +92,7 @@ const defaults = (): Settings => ({
   photo: { exposure: true, color: true, vignetting: true },
   render: { ...defaultRender(), max_megapixels: IS_MOBILE ? 60 : 300 },
   output: { format: "Auto", jpeg_quality: 95, transparent: false, gpano: true, html_viewer: false },
-  ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44", checkUpdates: true, skippedVersion: "" },
+  ui: { showGrid: true, showOutlines: false, showNav: !IS_MOBILE, quality: IS_MOBILE ? "fast" : "normal", revealAfter: !IS_MOBILE, theme: "dark", customColor: "#1e2a44", checkUpdates: true, skippedVersion: "", onboarded: false },
 });
 
 export interface ImageItem {
@@ -203,7 +203,7 @@ export const app = $state({
   sphereBuilding: false,
   log: [] as LogEntry[],
   toasts: [] as Toast[],
-  dialogs: { about: false, shortcuts: false, log: false, exit: false, cp: false },
+  dialogs: { about: false, shortcuts: false, log: false, exit: false, cp: false, welcome: false },
   manualPoints: [] as ManualPoint[],
   cpPair: null as [number, number] | null,
   report: null as MatchReport | null,
@@ -268,6 +268,7 @@ export async function init() {
   S.settings = s;
   setTheme(s.ui.theme, s.ui.customColor, false);
   await applyLang(s.lang);
+  if (!s.ui.onboarded) app.dialogs.welcome = true;
 
   await listen<{ stage: string; fraction: number }>("progress", (e) => {
     if (app.job) {
@@ -377,6 +378,66 @@ export async function pickFiles() {
   }
   const r = await open({ multiple: true, filters: [{ name: "Images / RAW", extensions: [...IMAGE_EXT, ...IMAGE_EXT.map((e) => e.toUpperCase())] }] });
   if (r) addPaths(Array.isArray(r) ? r : [r]);
+}
+
+const PROJECT_EXT = "openpano";
+
+/** Desktop: save the image list and stitching settings so the session can be reopened later. */
+export async function saveProject() {
+  if (!app.images.length) return;
+  const first = app.images[0];
+  const dir = first.path.replace(/[\\/][^\\/]*$/, "");
+  const path = await save({ defaultPath: `${dir}\\${first.name.replace(/\.[^.]+$/, "")}.${PROJECT_EXT}`, filters: [{ name: "Panoramer", extensions: [PROJECT_EXT] }] });
+  if (!path) return;
+  const snap = $state.snapshot(S.settings);
+  const project = {
+    version: 1,
+    images: app.images.map((x) => ({ path: x.path, enabled: x.enabled })),
+    align: snap.align,
+    photo: snap.photo,
+    render: snap.render,
+    output: snap.output,
+  };
+  try {
+    await writeFile(path, new TextEncoder().encode(JSON.stringify(project, null, 2)));
+    toast(`${t("projectSaved")}: ${path.split(/[\\/]/).pop()}`, "ok");
+  } catch (e) {
+    toast(`${t("projectError")}: ${e}`, "error");
+  }
+}
+
+export async function openProject() {
+  if (busyBlocking()) return;
+  const r = await open({ multiple: false, filters: [{ name: "Panoramer", extensions: [PROJECT_EXT] }] });
+  if (!r || typeof r !== "string") return;
+  try {
+    const p = JSON.parse(new TextDecoder().decode(await readFile(r)));
+    if (!Array.isArray(p.images)) throw new Error("format");
+    clearImages();
+    for (const k of ["align", "photo", "render", "output"] as const) if (p[k]) (S.settings as any)[k] = deepMerge((S.settings as any)[k], p[k]);
+    persist();
+    await addPaths(p.images.map((x: any) => x.path));
+    const off = new Set(p.images.filter((x: any) => x.enabled === false).map((x: any) => x.path));
+    for (const it of app.images) if (off.has(it.path)) it.enabled = false;
+    toast(t("projectOpened"), "ok", { label: t("align"), run: () => align() });
+  } catch (e) {
+    toast(`${t("projectError")}: ${e}`, "error");
+  }
+}
+
+export function logText(): string {
+  return app.log.map((l) => `${l.time.toISOString()} ${l.error ? "ERROR " : ""}${l.text}`).join("\n");
+}
+
+export async function saveLog() {
+  const path = await save({ defaultPath: "panoramer-log.txt", filters: [{ name: "Text", extensions: ["txt"] }] }).catch(() => null);
+  if (!path) return;
+  try {
+    await writeFile(path, new TextEncoder().encode(logText()));
+    toast(t("saved"), "ok");
+  } catch (e) {
+    toast(`${e}`, "error");
+  }
 }
 
 export async function pickFolder() {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { getCurrentWindow, ProgressBarStatus, UserAttentionType } from "@tauri-apps/api/window";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Icon from "./components/Icon.svelte";
@@ -17,6 +17,7 @@
   import {
     S, app, vw, init, setLanguage, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
     hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere, IS_MOBILE, setTheme, toast,
+    saveProject, openProject, saveLog, logText,
   } from "./lib/store.svelte";
 
   const AUTHOR = "https://redzikowski.com";
@@ -24,6 +25,32 @@
   const VERSION = $derived(upd.current || "2.2.0");
 
   let menuOpen = $state(false);
+
+  function closeWelcome() {
+    app.dialogs.welcome = false;
+    if (!S.settings.ui.onboarded) {
+      S.settings.ui.onboarded = true;
+      persist();
+    }
+  }
+
+  // Windows taskbar progress; attention request when a long job ends in the background.
+  let lastJobKind: string | null = null;
+  $effect(() => {
+    if (IS_MOBILE) return;
+    const j = app.job;
+    const w = getCurrentWindow();
+    if (j && j.kind !== "sphere") {
+      w.setProgressBar({ status: ProgressBarStatus.Normal, progress: Math.round(Math.min(1, Math.max(0, j.fraction)) * 100) }).catch(() => {});
+      lastJobKind = j.kind;
+    } else {
+      w.setProgressBar({ status: ProgressBarStatus.None }).catch(() => {});
+      if (lastJobKind === "render" || lastJobKind === "align") {
+        if (!document.hasFocus()) w.requestUserAttention(UserAttentionType.Informational).catch(() => {});
+      }
+      lastJobKind = null;
+    }
+  });
   let winW = $state(window.innerWidth);
   const compact = $derived(IS_MOBILE || winW < 900);
   let tab = $state<"images" | "view" | "settings">("images");
@@ -97,7 +124,7 @@
     if (ctrl && k === "enter") return (e.preventDefault(), align());
     if (ctrl && k === "s") return (e.preventDefault(), renderAndSave());
     if (ctrl || e.altKey) return;
-    if (app.dialogs.exit || app.dialogs.about || app.dialogs.shortcuts || app.dialogs.log) {
+    if (app.dialogs.exit || app.dialogs.about || app.dialogs.shortcuts || app.dialogs.log || app.dialogs.welcome) {
       if (k === "escape") Object.keys(app.dialogs).forEach((d) => ((app.dialogs as any)[d] = false));
       return;
     }
@@ -217,6 +244,10 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="dropdown" onclick={(e) => e.stopPropagation()}>
               <button onclick={() => ((menuOpen = false), pickFolder())}><Icon name="folder" size={15} />{t("addFolder")}</button>
+              {#if !IS_MOBILE}
+                <button onclick={() => ((menuOpen = false), openProject())}><Icon name="folder" size={15} />{t("projectOpen")}</button>
+                <button disabled={!app.images.length} onclick={() => ((menuOpen = false), saveProject())}><Icon name="download" size={15} />{t("projectSave")}</button>
+              {/if}
               <div class="dsep"></div>
               <div class="dlabel">{t("previewQuality")}</div>
               <div class="seg full q">
@@ -252,6 +283,7 @@
                 <button class:on={S.settings.lang === "en"} onclick={() => setLanguage("en")}>English</button>
               </div>
               <div class="dsep"></div>
+              <button onclick={() => ((menuOpen = false), (app.dialogs.welcome = true))}><Icon name="info" size={15} />{t("welcomeMenu")}</button>
               <button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>
               <button onclick={() => ((menuOpen = false), (app.dialogs.log = true))}><Icon name="list" size={15} />{t("log")}</button>
               <button onclick={() => ((menuOpen = false), openUrl(REPO))}><Icon name="github" size={15} />{t("projectPage")}</button>
@@ -443,7 +475,29 @@
         </div>
         <div class="mfoot">
           <button class="btn ghost" onclick={() => (app.log = [])}>{t("clearLog")}</button>
+          <button class="btn ghost" onclick={() => navigator.clipboard.writeText(logText()).then(() => toast(t("copied"), "ok"))}>{t("copyLog")}</button>
+          {#if !IS_MOBILE}<button class="btn ghost" onclick={saveLog}>{t("saveLog")}</button>{/if}
           <button class="btn" onclick={() => (app.dialogs.log = false)}>{t("close")}</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if app.dialogs.welcome}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal-bg" onclick={closeWelcome}>
+      <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="welcome-title" onclick={(e) => e.stopPropagation()}>
+        <h3 id="welcome-title"><Icon name="info" size={18} />{t("welcomeTitle")}</h3>
+        <ol class="tips">
+          <li>{t("tip1")}</li>
+          <li>{t("tip2")}</li>
+          <li>{t("tip3")}</li>
+          <li>{t("tip4")}</li>
+          <li>{t("tip5")}</li>
+        </ol>
+        <div class="mfoot">
+          <button class="btn primary" onclick={closeWelcome}>{t("welcomeStart")}</button>
         </div>
       </div>
     </div>
@@ -1045,6 +1099,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .tips {
+    margin: 4px 0 8px;
+    padding-left: 20px;
+    display: grid;
+    gap: 8px;
+    line-height: 1.45;
   }
   .modal-bg.strong {
     background: rgba(0, 0, 0, 0.7);
