@@ -57,6 +57,8 @@ pub struct RenderSettings {
     pub smart_seams: bool,
     /// Prefer well-exposed source pixels when choosing seams (exposure fusion of brackets).
     pub exposure_fusion: bool,
+    /// Per aligned image: its content wins wherever it overlaps others (keep a person, hide one).
+    pub priority: Vec<bool>,
 }
 
 impl Default for RenderSettings {
@@ -81,6 +83,7 @@ impl Default for RenderSettings {
             flip_v: false,
             smart_seams: true,
             exposure_fusion: false,
+            priority: Vec::new(),
         }
     }
 }
@@ -454,6 +457,7 @@ pub fn render(
         let lrows = &mut label[y0 * cw..y1 * cw];
         let brows = &mut best[y0 * cw..y1 * cw];
         let fsrc = if st.exposure_fusion { seam_src.and_then(|f| f(i)) } else { None };
+        let boost = if st.priority.get(i).copied().unwrap_or(false) { 1000.0 } else { 1.0 };
         lrows.par_chunks_mut(cw).zip(brows.par_chunks_mut(cw)).enumerate().for_each(|(ry, (lr, br))| {
             let y = (y0 + ry) as f64;
             for x in x0..x1 {
@@ -468,6 +472,7 @@ pub fn render(
                             w *= (-(v - 0.5) * (v - 0.5) / 0.08).exp() + 1e-3;
                         }
                     }
+                    w *= boost;
                     if w > br[x] {
                         br[x] = w;
                         lr[x] = i as u16;

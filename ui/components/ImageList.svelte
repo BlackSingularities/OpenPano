@@ -2,7 +2,7 @@
   import Icon from "./Icon.svelte";
   import { t } from "../lib/i18n.svelte";
   import { yawPitchTowards, mul } from "../lib/geometry";
-  import { S, app, pickFiles, pickFolder, removeImage, toggleImage, setAllEnabled, sortImages, clearImages, reveal, busyBlocking, centreOn } from "../lib/store.svelte";
+  import { S, app, pickFiles, pickFolder, removeImage, toggleImage, setAllEnabled, sortImages, clearImages, reveal, busyBlocking, centreOn, togglePreferred } from "../lib/store.svelte";
 
   let menu = $state<{ id: number; x: number; y: number } | null>(null);
 
@@ -79,6 +79,7 @@
             <Icon name="alert" size={20} />
           {/if}
           {#if c}<span class="num" class:bad={!c.cam.aligned}>{c.idx + 1}</span>{/if}
+          {#if it.preferred}<span class="pref" data-tip={t("preferredTag")} aria-label={t("preferredTag")}><Icon name="spark" size={11} /></span>{/if}
           {#if it.isRaw}<span class="raw" class:prev={it.previewOnly} data-tip={it.previewOnly ? t("previewOnlyHint") : undefined}>{it.previewOnly ? t("previewOnly") : "RAW"}</span>{/if}
         </div>
         <div class="meta">
@@ -124,6 +125,7 @@
   {#if it}
     <div class="menu" style="left:{menu.x}px;top:{menu.y}px">
       <button disabled={!c?.cam.aligned} onclick={() => centerOn(it.id)}><Icon name="target" size={15} />{t("centerOnImage")}</button>
+      <button disabled={busyBlocking() || !it.enabled} onclick={() => togglePreferred(it.id)}><Icon name="spark" size={15} />{it.preferred ? t("unprefer") : t("prefer")}</button>
       <button disabled={busyBlocking()} onclick={() => toggleImage(it.id)}><Icon name={it.enabled ? "x" : "check"} size={15} />{it.enabled ? t("disable") : t("enable")}</button>
       <button onclick={() => reveal(it.path)}><Icon name="folder" size={15} />{t("reveal")}</button>
       <div class="msep"></div>
@@ -301,6 +303,18 @@
     font-size: 9.5px;
     font-weight: 800;
     letter-spacing: 0.4px;
+  }
+  .pref {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
   }
   .raw.prev {
     background: var(--warn);

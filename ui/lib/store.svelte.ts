@@ -39,6 +39,7 @@ export interface RenderSettings {
   circular_fisheye: boolean;
   bicubic: boolean;
   exposure_fusion?: boolean;
+  priority?: boolean[];
   flip_h: boolean;
   flip_v: boolean;
 }
@@ -110,6 +111,8 @@ export interface ImageItem {
   camera: string;
   thumb: string;
   previewOnly?: boolean;
+  /** Content of this image wins in overlaps. */
+  preferred?: boolean;
   /** EXIF DateTimeOriginal, "YYYY:MM:DD HH:MM:SS" */
   datetime?: string;
   enabled: boolean;
@@ -495,6 +498,20 @@ export async function batchRender() {
   toast(`${t("batchDone")}: ${done}/${groups.length}`, done ? "ok" : "error", { label: t("showFile"), run: () => revealItemInDir(dir) });
 }
 
+function syncPriority() {
+  const ids = app.alignedIds;
+  const p = ids.map((id) => !!app.images.find((x) => x.id === id)?.preferred);
+  S.settings.render.priority = p.some(Boolean) ? p : [];
+}
+
+export function togglePreferred(id: number) {
+  const it = app.images.find((x) => x.id === id);
+  if (!it) return;
+  it.preferred = !it.preferred;
+  syncPriority();
+  if (app.align) buildSphere();
+}
+
 export function logText(): string {
   return app.log.map((l) => `${l.time.toISOString()} ${l.error ? "ERROR " : ""}${l.text}`).join("\n");
 }
@@ -620,6 +637,7 @@ export async function align() {
     app.align = info;
     await loadReport(ids);
     app.alignedIds = ids;
+    syncPriority();
     app.workVersion++;
     const n = info.cameras.filter((c) => c.aligned).length;
     log(`${t("alignDone")}: ${n}/${ids.length} · RMS ${info.rms.toFixed(2)} px · ${info.seconds.toFixed(1)} s`);
