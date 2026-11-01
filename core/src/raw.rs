@@ -32,7 +32,13 @@ pub struct RawInfo {
 /// Decode and develop a RAW file into linear sRGB-primaries data, white balanced, where 1.0 is
 /// sensor clipping. When `half` is true a fast half-resolution development is used.
 pub fn load_raw(path: &Path, half: bool) -> Result<(RgbImage, RawInfo)> {
-    let raw = rawloader::decode_file(path).map_err(|e| anyhow!("RAW: {}", e))?;
+    let raw = match rawloader::decode_file(path) {
+        Ok(r) => r,
+        #[cfg(feature = "rawler")]
+        Err(_) => return load_rawler(path, half),
+        #[cfg(not(feature = "rawler"))]
+        Err(e) => return Err(anyhow!("RAW: {}", e)),
+    };
     let info = RawInfo {
         make: raw.clean_make.clone(),
         model: raw.clean_model.clone(),
@@ -43,6 +49,29 @@ pub fn load_raw(path: &Path, half: bool) -> Result<(RgbImage, RawInfo)> {
     let is_dng = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("dng"));
     let gm = if is_dng { crate::dng::gain_maps(path) } else { crate::dng::GainMaps::default() };
     let img = develop(&raw, half, &gm)?;
+    Ok((img, info))
+}
+
+/// Fallback decode + development through rawler (linear, camera matrix applied, no gamma).
+#[cfg(feature = "rawler")]
+fn load_rawler(path: &Path, half: bool) -> Result<(RgbImage, RawInfo)> {
+    use rawler::imgop::develop::{Intermediate, RawDevelop};
+    let raw = rawler::decode_file(path).map_err(|e| anyhow!("RAW: {}", e))?;
+    let inter = RawDevelop::default().develop_intermediate(&raw).map_err(|e| anyhow!("RAW: {}", e))?;
+    let (w, h, data): (usize, usize, Vec<[f32; 3]>) = match inter {
+        Intermediate::ThreeColor(c) => (c.width, c.height, c.data),
+        Intermediate::FourColor(c) => (c.width, c.height, c.data.into_iter().map(|p| [p[0], (p[1] + p[3]) * 0.5, p[2]]).collect()),
+        Intermediate::Monochrome(m) => (m.width, m.height, m.data.into_iter().map(|v| [v, v, v]).collect()),
+    };
+    let full = RgbImage { w, h, data };
+    let info = RawInfo {
+        make: raw.camera.clean_make.clone(),
+        model: raw.camera.clean_model.clone(),
+        orientation: raw.orientation.to_u16() as u32,
+        full_w: w,
+        full_h: h,
+    };
+    let img = if half { full.resized((w / 2).max(1), (h / 2).max(1)) } else { full };
     Ok((img, info))
 }
 

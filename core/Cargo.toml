@@ -15,3 +15,9 @@ half = "2"
 flate2 = "1"
 anyhow = "1"
 sys-locale = "0.3"
+rawler = { version = "0.7", optional = true }
+
+[features]
+# Second RAW decoder (rawler / dnglab) for files rawloader cannot read, e.g. newer cameras,
+# JPEG XL and lossy DNGs. Build with `--features openpano-core/rawler`.
+rawler = ["dep:rawler"]
