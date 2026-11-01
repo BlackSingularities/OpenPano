@@ -24,6 +24,7 @@ pub struct WorkImage {
     /// work / full scale
     pub scale: f64,
     pub thumb: (usize, usize, Vec<u8>),
+    pub preview_only: bool,
 }
 
 pub const WORK_MEGAPIXELS: f64 = 1.6;
@@ -51,6 +52,7 @@ pub fn load_work(path: &Path) -> Result<WorkImage, StitchError> {
         img,
         scale,
         thumb: (tw, th, rgba),
+        preview_only: l.preview_only,
     })
 }
 

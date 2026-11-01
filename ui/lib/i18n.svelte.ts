@@ -171,6 +171,8 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   langAuto: ["Auto", "Auto"],
+  previewOnly: ["PODGLĄD", "PREVIEW"],
+  previewOnlyHint: ["Nie udało się zdekodować danych RAW – użyto osadzonego podglądu JPEG (niższa rozdzielczość).", "RAW data could not be decoded – the embedded JPEG preview is used (lower resolution)."],
   close: ["Zamknij", "Close"],
   ideaBy: ["Projekt i wykonanie", "Design and development"],
   coffee: ["Postaw kawę", "Buy me a coffee"],

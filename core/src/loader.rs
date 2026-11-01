@@ -146,6 +146,8 @@ pub struct Loaded {
     /// Full-resolution size of the oriented image (differs from `image` for half-size RAW loads).
     pub full_w: usize,
     pub full_h: usize,
+    /// Only the embedded camera preview could be decoded (reduced resolution).
+    pub preview_only: bool,
 }
 
 /// Load an image. `half` requests a fast reduced-resolution RAW decode (used for alignment and
@@ -161,7 +163,7 @@ pub fn load(path: &Path, half: bool) -> Result<Loaded> {
                     return Err(e).with_context(|| format!("{}", path.display()));
                 };
                 let image = dynamic_to_linear(&prev).rotate_orientation(meta.orientation);
-                return Ok(Loaded { full_w: image.w, full_h: image.h, image, meta, is_raw: true });
+                return Ok(Loaded { full_w: image.w, full_h: image.h, image, meta, is_raw: true, preview_only: true });
             }
         };
         if meta.make.is_empty() {
@@ -175,7 +177,7 @@ pub fn load(path: &Path, half: bool) -> Result<Loaded> {
         let image = img.rotate_orientation(orient);
         let (fw, fh) = if (5..=8).contains(&orient) { (info.full_h, info.full_w) } else { (info.full_w, info.full_h) };
         let (fw, fh) = if half { (fw, fh) } else { (image.w, image.h) };
-        return Ok(Loaded { full_w: fw, full_h: fh, image, meta, is_raw: true });
+        return Ok(Loaded { full_w: fw, full_h: fh, image, meta, is_raw: true, preview_only: false });
     }
     let dynimg = image::ImageReader::open(path)
         .with_context(|| format!("{}", path.display()))?
@@ -183,7 +185,7 @@ pub fn load(path: &Path, half: bool) -> Result<Loaded> {
         .decode()
         .map_err(|e| anyhow!("{}: {}", path.display(), e))?;
     let image = dynamic_to_linear(&dynimg).rotate_orientation(meta.orientation);
-    Ok(Loaded { full_w: image.w, full_h: image.h, image, meta, is_raw: false })
+    Ok(Loaded { full_w: image.w, full_h: image.h, image, meta, is_raw: false, preview_only: false })
 }
 
 pub fn dynamic_to_linear(img: &image::DynamicImage) -> RgbImage {

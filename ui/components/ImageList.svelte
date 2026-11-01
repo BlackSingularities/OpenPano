@@ -79,7 +79,7 @@
             <Icon name="alert" size={20} />
           {/if}
           {#if c}<span class="num" class:bad={!c.cam.aligned}>{c.idx + 1}</span>{/if}
-          {#if it.isRaw}<span class="raw">RAW</span>{/if}
+          {#if it.isRaw}<span class="raw" class:prev={it.previewOnly} data-tip={it.previewOnly ? t("previewOnlyHint") : undefined}>{it.previewOnly ? t("previewOnly") : "RAW"}</span>{/if}
         </div>
         <div class="meta">
           <div class="name" data-tip={it.path}>{it.name}</div>
@@ -301,6 +301,10 @@
     font-size: 9.5px;
     font-weight: 800;
     letter-spacing: 0.4px;
+  }
+  .raw.prev {
+    background: var(--warn);
+    color: #1a1400;
   }
   .meta {
     flex: 1;

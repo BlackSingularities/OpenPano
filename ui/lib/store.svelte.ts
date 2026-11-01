@@ -107,6 +107,7 @@ export interface ImageItem {
   summary: string;
   camera: string;
   thumb: string;
+  previewOnly?: boolean;
   enabled: boolean;
 }
 
@@ -274,11 +275,15 @@ export async function init() {
       app.job.fraction = e.payload.fraction;
     }
   });
+  await listen<{ id: number; thumb: string }>("image-thumb", (e) => {
+    const it = app.images.find((x) => x.id === e.payload.id);
+    if (it && it.status === "loading" && e.payload.thumb) it.thumb = e.payload.thumb;
+  });
   await listen<any>("image-loaded", (e) => {
     const p = e.payload;
     const it = app.images.find((x) => x.id === p.id);
     if (!it) return;
-    if (p.ok) Object.assign(it, { status: "ok", width: p.width, height: p.height, isRaw: p.isRaw, summary: p.summary, camera: p.camera, thumb: p.thumb });
+    if (p.ok) Object.assign(it, { status: "ok", width: p.width, height: p.height, isRaw: p.isRaw, summary: p.summary, camera: p.camera, thumb: p.thumb, previewOnly: p.previewOnly });
     else {
       it.status = "error";
       it.error = p.error;

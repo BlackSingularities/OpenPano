@@ -380,3 +380,15 @@ pub fn embedded_preview(path: &Path) -> Option<image::DynamicImage> {
     let (pos, _) = best?;
     image::load_from_memory_with_format(&bytes[pos..], image::ImageFormat::Jpeg).ok()
 }
+
+/// Small sRGB thumbnail from the embedded preview, shown while the RAW is still being developed.
+pub fn preview_thumb(path: &Path, width: u32, orientation: u32) -> Option<image::RgbImage> {
+    let p = embedded_preview(path)?;
+    let p = match orientation {
+        3 => p.rotate180(),
+        6 => p.rotate90(),
+        8 => p.rotate270(),
+        _ => p,
+    };
+    Some(p.thumbnail(width, width * 4).to_rgb8())
+}

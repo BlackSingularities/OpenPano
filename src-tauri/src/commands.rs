@@ -204,17 +204,28 @@ struct Loaded {
     summary: String,
     camera: String,
     thumb: String,
+    preview_only: bool,
+}
+
+#[derive(Serialize, Clone)]
+struct EarlyThumb {
+    id: u32,
+    thumb: String,
+}
+
+fn jpeg_data_url(rgb: &[u8], w: u32, h: u32) -> String {
+    let mut buf = Vec::new();
+    let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 85);
+    if enc.encode(rgb, w, h, image::ExtendedColorType::Rgb8).is_err() {
+        return String::new();
+    }
+    format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&buf))
 }
 
 fn thumb_data_url(w: &WorkImage) -> String {
     let (tw, th, rgba) = &w.thumb;
     let rgb: Vec<u8> = rgba.chunks(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
-    let mut buf = Vec::new();
-    let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 85);
-    if enc.encode(&rgb, *tw as u32, *th as u32, image::ExtendedColorType::Rgb8).is_err() {
-        return String::new();
-    }
-    format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&buf))
+    jpeg_data_url(&rgb, *tw as u32, *th as u32)
 }
 
 /// Register paths (folders are expanded) and load them in the background. Returns the entries
@@ -259,8 +270,15 @@ fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Ve
         pool.install(|| {
             jobs.par_iter().for_each(|(id, path)| {
                 let ev = if cancel.is_cancelled() {
-                    Loaded { id: *id, ok: false, error: Some(openpano_core::i18n::tr(openpano_core::i18n::Key::Cancelled).into()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new() }
+                    Loaded { id: *id, ok: false, error: Some(openpano_core::i18n::tr(openpano_core::i18n::Key::Cancelled).into()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new(), preview_only: false }
                 } else {
+                    // RAW development takes a while: show the embedded camera preview first.
+                    if openpano_core::raw::is_raw_path(path) {
+                        let orient = openpano_core::loader::read_metadata(path).orientation;
+                        if let Some(t) = openpano_core::raw::preview_thumb(path, 160, orient) {
+                            let _ = app2.emit("image-thumb", EarlyThumb { id: *id, thumb: jpeg_data_url(t.as_raw(), t.width(), t.height()) });
+                        }
+                    }
                     match project::load_work(path) {
                         Ok(w) => {
                             let w = Arc::new(w);
@@ -274,12 +292,13 @@ fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Ve
                                 summary: w.meta.summary(),
                                 camera: format!("{} {}", w.meta.make, w.meta.model).trim().to_string(),
                                 thumb: thumb_data_url(&w),
+                                preview_only: w.preview_only,
                             };
                             let st: State<'_, Shared> = app2.state();
                             st.inner.lock().unwrap().works.insert(*id, w);
                             ev
                         }
-                        Err(e) => Loaded { id: *id, ok: false, error: Some(e.to_string()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new() },
+                        Err(e) => Loaded { id: *id, ok: false, error: Some(e.to_string()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new(), preview_only: false },
                     }
                 };
                 let c = counter.fetch_add(1, Ordering::Relaxed) + 1;
