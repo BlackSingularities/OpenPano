@@ -108,6 +108,8 @@ export interface ImageItem {
   camera: string;
   thumb: string;
   previewOnly?: boolean;
+  /** EXIF DateTimeOriginal, "YYYY:MM:DD HH:MM:SS" */
+  datetime?: string;
   enabled: boolean;
 }
 
@@ -203,6 +205,7 @@ export const app = $state({
   sphereBuilding: false,
   log: [] as LogEntry[],
   toasts: [] as Toast[],
+  batch: null as { index: number; total: number; cancelled: boolean } | null,
   dialogs: { about: false, shortcuts: false, log: false, exit: false, cp: false, welcome: false },
   manualPoints: [] as ManualPoint[],
   cpPair: null as [number, number] | null,
@@ -284,7 +287,7 @@ export async function init() {
     const p = e.payload;
     const it = app.images.find((x) => x.id === p.id);
     if (!it) return;
-    if (p.ok) Object.assign(it, { status: "ok", width: p.width, height: p.height, isRaw: p.isRaw, summary: p.summary, camera: p.camera, thumb: p.thumb, previewOnly: p.previewOnly });
+    if (p.ok) Object.assign(it, { status: "ok", width: p.width, height: p.height, isRaw: p.isRaw, summary: p.summary, camera: p.camera, thumb: p.thumb, previewOnly: p.previewOnly, datetime: p.datetime });
     else {
       it.status = "error";
       it.error = p.error;
@@ -423,6 +426,71 @@ export async function openProject() {
   } catch (e) {
     toast(`${t("projectError")}: ${e}`, "error");
   }
+}
+
+function shotTime(d?: string): number | null {
+  const m = d?.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null;
+}
+
+/** Split loaded images into separate panoramas wherever consecutive shots are more than `gapS` apart. */
+export function timeGroups(gapS = 30): ImageItem[][] {
+  const ok = app.images.filter((x) => x.status === "ok");
+  const timed = ok.map((x) => ({ x, t: shotTime(x.datetime) }));
+  if (timed.some((v) => v.t === null)) return ok.length ? [ok] : [];
+  timed.sort((a, b) => a.t! - b.t! || a.x.name.localeCompare(b.x.name, undefined, { numeric: true }));
+  const groups: ImageItem[][] = [];
+  let last = -Infinity;
+  for (const v of timed) {
+    if (v.t! - last > gapS * 1000 || !groups.length) groups.push([]);
+    groups[groups.length - 1].push(v.x);
+    last = v.t!;
+  }
+  return groups;
+}
+
+/** Desktop: align and render every time group into a chosen folder, one after another. */
+export async function batchRender() {
+  if (busyBlocking() || IS_MOBILE) return;
+  const groups = timeGroups().filter((g) => g.length >= 2);
+  if (!groups.length) return toast(t("batchNone"), "error");
+  const dir = await open({ directory: true, title: t("batchPickDir") });
+  if (!dir || typeof dir !== "string") return;
+  const before = new Map(app.images.map((x) => [x.id, x.enabled]));
+  let done = 0;
+  app.batch = { index: 0, total: groups.length, cancelled: false };
+  try {
+    for (const [i, g] of groups.entries()) {
+      if (app.batch.cancelled) break;
+      app.batch.index = i + 1;
+      const ids = new Set(g.map((x) => x.id));
+      for (const it of app.images) it.enabled = ids.has(it.id);
+      invalidateAlignment();
+      await align();
+      if (!app.align) {
+        log(`${t("batchSkip")} ${i + 1}: ${g[0].name}`, true);
+        continue;
+      }
+      const fmt = resolvedFormat();
+      const path = `${dir}\\${g[0].name.replace(/\.[^.]+$/, "")}_pano.${EXT[fmt]}`;
+      const render = $state.snapshot(S.settings.render);
+      const output = { ...$state.snapshot(S.settings.output), format: fmt };
+      app.job = { kind: "render", stage: "", fraction: 0, started: Date.now() };
+      try {
+        const r = await invoke<{ path: string; width: number; height: number }>("render_and_save", { path, render, output });
+        log(`${t("saved")}: ${r.path.split(/[\\/]/).pop()} · ${r.width}×${r.height}`);
+        done++;
+      } catch (e) {
+        log(`${t("renderFailed")}: ${e}`, true);
+      } finally {
+        app.job = null;
+      }
+    }
+  } finally {
+    app.batch = null;
+    for (const it of app.images) it.enabled = before.get(it.id) ?? true;
+  }
+  toast(`${t("batchDone")}: ${done}/${groups.length}`, done ? "ok" : "error", { label: t("showFile"), run: () => revealItemInDir(dir) });
 }
 
 export function logText(): string {
@@ -722,6 +790,7 @@ async function renderMobile(base: string, fmt: Exclude<OutFormat, "Auto">) {
 }
 
 export function cancelJob() {
+  if (app.batch) app.batch.cancelled = true;
   invoke("cancel_job");
 }
 

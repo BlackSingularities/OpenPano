@@ -205,6 +205,7 @@ struct Loaded {
     camera: String,
     thumb: String,
     preview_only: bool,
+    datetime: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -270,7 +271,7 @@ fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Ve
         pool.install(|| {
             jobs.par_iter().for_each(|(id, path)| {
                 let ev = if cancel.is_cancelled() {
-                    Loaded { id: *id, ok: false, error: Some(openpano_core::i18n::tr(openpano_core::i18n::Key::Cancelled).into()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new(), preview_only: false }
+                    Loaded { id: *id, ok: false, error: Some(openpano_core::i18n::tr(openpano_core::i18n::Key::Cancelled).into()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new(), preview_only: false, datetime: String::new() }
                 } else {
                     // RAW development takes a while: show the embedded camera preview first.
                     if openpano_core::raw::is_raw_path(path) {
@@ -293,12 +294,13 @@ fn register_and_load(app: &AppHandle, state: &Shared, paths: Vec<PathBuf>) -> Ve
                                 camera: format!("{} {}", w.meta.make, w.meta.model).trim().to_string(),
                                 thumb: thumb_data_url(&w),
                                 preview_only: w.preview_only,
+                                datetime: w.meta.datetime.clone(),
                             };
                             let st: State<'_, Shared> = app2.state();
                             st.inner.lock().unwrap().works.insert(*id, w);
                             ev
                         }
-                        Err(e) => Loaded { id: *id, ok: false, error: Some(e.to_string()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new(), preview_only: false },
+                        Err(e) => Loaded { id: *id, ok: false, error: Some(e.to_string()), width: 0, height: 0, is_raw: false, summary: String::new(), camera: String::new(), thumb: String::new(), preview_only: false, datetime: String::new() },
                     }
                 };
                 let c = counter.fetch_add(1, Ordering::Relaxed) + 1;

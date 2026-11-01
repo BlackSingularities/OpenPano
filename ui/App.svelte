@@ -17,7 +17,7 @@
   import {
     S, app, vw, init, setLanguage, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
     hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere, IS_MOBILE, setTheme, toast,
-    saveProject, openProject, saveLog, logText,
+    saveProject, openProject, saveLog, logText, batchRender, timeGroups,
   } from "./lib/store.svelte";
 
   const AUTHOR = "https://redzikowski.com";
@@ -247,6 +247,9 @@
               {#if !IS_MOBILE}
                 <button onclick={() => ((menuOpen = false), openProject())}><Icon name="folder" size={15} />{t("projectOpen")}</button>
                 <button disabled={!app.images.length} onclick={() => ((menuOpen = false), saveProject())}><Icon name="download" size={15} />{t("projectSave")}</button>
+                <button disabled={busyBlocking() || timeGroups().filter((g) => g.length >= 2).length < 1} onclick={() => ((menuOpen = false), batchRender())}
+                  ><Icon name="list" size={15} />{t("batchMenu")} ({timeGroups().filter((g) => g.length >= 2).length})</button
+                >
               {/if}
               <div class="dsep"></div>
               <div class="dlabel">{t("previewQuality")}</div>
@@ -380,7 +383,7 @@
         <span class="spin"></span>
         <div class="pbar"><div class="pfill" style="width:{Math.max(2, app.job.fraction * 100)}%"></div></div>
         <span class="pct">{Math.round(app.job.fraction * 100)}%</span>
-        <span class="stage">{app.job.stage}</span>
+        <span class="stage">{#if app.batch}[{app.batch.index}/{app.batch.total}] {/if}{app.job.stage}</span>
         <span class="muted">{Math.round((now - app.job.started) / 1000)} s</span>
         <button class="btn sm" onclick={cancelJob}><Icon name="stop" size={12} />{t("cancel")}</button>
       {:else}
