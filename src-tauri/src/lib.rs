@@ -14,6 +14,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::set_language,
             commands::system_language,
+            commands::take_shared_files,
             commands::load_settings,
             commands::save_settings,
             commands::cancel_job,

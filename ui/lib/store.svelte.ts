@@ -277,6 +277,17 @@ export async function init() {
   setTheme(s.ui.theme, s.ui.customColor, false);
   await applyLang(s.lang);
   if (!s.ui.onboarded) app.dialogs.welcome = true;
+  if (IS_MOBILE) {
+    // images shared from the gallery / other apps ("Share" → Panoramer)
+    const take = async () => {
+      if (app.job && app.job.kind !== "load" && app.job.kind !== "sphere") return;
+      const paths = await invoke<string[]>("take_shared_files").catch(() => []);
+      if (paths.length) addPaths(paths);
+    };
+    take();
+    setTimeout(take, 1500);
+    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && setTimeout(take, 300));
+  }
 
   await listen<{ stage: string; fraction: number }>("progress", (e) => {
     if (app.job) {

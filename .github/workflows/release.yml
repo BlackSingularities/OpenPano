@@ -71,6 +71,7 @@ jobs:
       - name: Build APK
         run: |
           npx tauri android init --ci
+          python3 scripts/patch_android.py src-tauri/gen/android
           cp -R src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
           npx tauri android build --apk --ci
       - name: Sign APK

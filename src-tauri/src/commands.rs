@@ -166,6 +166,26 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).to_string()
 }
 
+/// Android: files shared to the app (copied by MainActivity into `<cache>/shared`). They are moved
+/// to a private folder so each share is imported once; returns their new paths.
+#[tauri::command]
+pub fn take_shared_files(app: AppHandle) -> Vec<String> {
+    let Ok(cache) = app.path().app_cache_dir() else { return Vec::new() };
+    let Ok(rd) = std::fs::read_dir(cache.join("shared")) else { return Vec::new() };
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let dest = cache.join("import").join(format!("shared-{stamp}"));
+    if std::fs::create_dir_all(&dest).is_err() {
+        return Vec::new();
+    }
+    rd.flatten()
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| {
+            let to = dest.join(e.file_name());
+            std::fs::rename(e.path(), &to).ok().map(|_| to.to_string_lossy().to_string())
+        })
+        .collect()
+}
+
 /// Raw bytes of a file (used on mobile to copy rendered output to a user-chosen location).
 #[tauri::command]
 pub fn read_file_bytes(path: String) -> Res<tauri::ipc::Response> {
