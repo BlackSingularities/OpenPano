@@ -59,6 +59,8 @@ pub struct RenderSettings {
     pub exposure_fusion: bool,
     /// Per aligned image: its content wins wherever it overlaps others (keep a person, hide one).
     pub priority: Vec<bool>,
+    /// Use the GPU for the warp step when built with the `gpu` feature and an adapter exists.
+    pub gpu: bool,
 }
 
 impl Default for RenderSettings {
@@ -84,6 +86,7 @@ impl Default for RenderSettings {
             smart_seams: true,
             exposure_fusion: false,
             priority: Vec::new(),
+            gpu: true,
         }
     }
 }
@@ -362,6 +365,44 @@ pub struct RenderOutput {
     pub crop: (usize, usize, usize, usize),
 }
 
+/// GPU warp of one tile: exact mapping on a sparse grid (CPU), interpolation + sampling on the
+/// GPU. None when no adapter is available or anything fails – the caller then uses the CPU.
+#[cfg(feature = "gpu")]
+#[allow(clippy::too_many_arguments)]
+fn gpu_warp(
+    canvas: &Canvas,
+    mapper: &Mapper,
+    img: &RgbImage,
+    scale: f64,
+    gains: [f32; 3],
+    photo: &Photometric,
+    hd2: f64,
+    bicubic: bool,
+    tx0: usize,
+    ty0: usize,
+    tw: usize,
+    th: usize,
+) -> Option<Vec<[f32; 4]>> {
+    use crate::gpu::{self, STEP};
+    let g = gpu::get()?;
+    let src = g.upload(img)?;
+    let gw = (tw.max(1) - 1) / STEP + 2;
+    let gh = (th.max(1) - 1) / STEP + 2;
+    let grid: Vec<[f32; 4]> = (0..gw * gh)
+        .into_par_iter()
+        .map(|n| {
+            let (x, y) = (tx0 + (n % gw) * STEP, ty0 + (n / gw) * STEP);
+            canvas
+                .pixel_dir(x as f64, y as f64)
+                .and_then(|d| mapper.map(&d))
+                .map(|(ix, iy, w)| [ix as f32, iy as f32, w, 1.0])
+                .unwrap_or([0.0; 4])
+        })
+        .collect();
+    let p = gpu::WarpParams { tw, th, gw, gh, scale: scale as f32, gains, vig: [photo.vig[0] as f32, photo.vig[1] as f32], hd2: hd2 as f32, bicubic };
+    g.warp(&src, &grid, &p)
+}
+
 pub struct Mapper<'a> {
     cam: &'a super::align::Camera,
     lens: LensType,
@@ -517,6 +558,24 @@ pub fn render(
         let mut valid = vec![0f32; tw * th];
         let mut band = vec![0f32; tw * th];
         let mut feather = vec![0f32; tw * th];
+        // exact CPU warp of one canvas pixel: (colour, feather weight)
+        let exact = |x: usize, y: usize| -> Option<([f32; 3], f32)> {
+            let d = canvas.pixel_dir(x as f64, y as f64)?;
+            let (ix, iy, w) = mapper.map(&d)?;
+            let sx = ix * s + (sw - 1.0) / 2.0;
+            let sy = iy * s + (sh - 1.0) / 2.0;
+            let p = if st.bicubic { src.img.sample_cubic(sx as f32, sy as f32) } else { src.img.sample(sx as f32, sy as f32) }?;
+            let vf = photo.vig_factor((ix * ix + iy * iy) / hd2);
+            Some(([p[0] * gains[0] * vf, p[1] * gains[1] * vf, p[2] * gains[2] * vf], w))
+        };
+        #[cfg(feature = "gpu")]
+        let gpu_tile: Option<Vec<[f32; 4]>> = if st.gpu {
+            gpu_warp(&canvas, &mapper, &src.img, s, gains, photo, hd2, st.bicubic, tx0, ty0, tw, th)
+        } else {
+            None
+        };
+        #[cfg(not(feature = "gpu"))]
+        let gpu_tile: Option<Vec<[f32; 4]>> = None;
         tile.par_chunks_mut(tw)
             .zip(valid.par_chunks_mut(tw))
             .zip(band.par_chunks_mut(tw))
@@ -526,14 +585,13 @@ pub fn render(
                 let y = ty0 + ry;
                 for rx in 0..tw {
                     let x = tx0 + rx;
-                    let Some(d) = canvas.pixel_dir(x as f64, y as f64) else { continue };
-                    let Some((ix, iy, w)) = mapper.map(&d) else { continue };
-                    let sx = ix * s + (sw - 1.0) / 2.0;
-                    let sy = iy * s + (sh - 1.0) / 2.0;
-                    let px = if st.bicubic { src.img.sample_cubic(sx as f32, sy as f32) } else { src.img.sample(sx as f32, sy as f32) };
-                    let Some(p) = px else { continue };
-                    let vf = photo.vig_factor((ix * ix + iy * iy) / hd2);
-                    trow[rx] = [p[0] * gains[0] * vf, p[1] * gains[1] * vf, p[2] * gains[2] * vf];
+                    let px = match gpu_tile.as_ref().map(|g| g[ry * tw + rx]) {
+                        Some(g) if g[3] >= 1.0 => Some(([g[0], g[1], g[2]], g[3] - 1.0)),
+                        Some(g) if g[3] == 0.0 => None,
+                        _ => exact(x, y),
+                    };
+                    let Some((c, w)) = px else { continue };
+                    trow[rx] = c;
                     vrow[rx] = 1.0;
                     frow[rx] = w;
                     if label[y * cw + x] == i as u16 {

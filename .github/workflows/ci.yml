@@ -21,6 +21,10 @@ jobs:
         run: npm run check
       - name: Test engine
         run: cargo test --release -p openpano-core
+      - name: Test engine with GPU and rawler features
+        run: cargo test --release -p openpano-core --features gpu,rawler -- --nocapture gpu
+      - name: Check optional features compile
+        run: cargo check --release -p openpano-core --features gpu,rawler
       - name: Build app
         run: npx tauri build --no-bundle
       - uses: actions/upload-artifact@v4

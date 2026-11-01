@@ -11,6 +11,10 @@ authors = ["redzikowski.com"]
 name = "openpano_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+gpu = ["openpano-core/gpu"]
+rawler = ["openpano-core/rawler"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
