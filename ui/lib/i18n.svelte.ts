@@ -202,7 +202,7 @@ const D = {
   saveLog: ["Zapisz do pliku", "Save to file"],
   copied: ["Skopiowano", "Copied"],
   welcomeMenu: ["Jak robić panoramy", "Shooting tips"],
-  welcomeTitle: ["Witaj w Panoramerze", "Welcome to Panoramer"],
+  tipsTitle: ["Witaj w Panoramerze", "Welcome to Panoramer"],
   welcomeStart: ["Zaczynamy", "Let's start"],
   tip1: ["Obracaj aparat wokół obiektywu (punktu nodalnego), a nie wokół siebie – unikniesz paralaksy.", "Rotate the camera around the lens (nodal point), not around yourself – this avoids parallax."],
   tip2: ["Zachowaj 30–50% nakładania sąsiednich kadrów.", "Keep 30–50% overlap between neighbouring frames."],
