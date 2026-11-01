@@ -392,3 +392,43 @@ pub fn preview_thumb(path: &Path, width: u32, orientation: u32) -> Option<image:
     };
     Some(p.thumbnail(width, width * 4).to_rgb8())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn jpeg(w: u32, h: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_pixel(w, h, image::Rgb([200, 100, 50]));
+        let mut buf = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 90).encode(img.as_raw(), w, h, image::ExtendedColorType::Rgb8).unwrap();
+        buf
+    }
+
+    #[test]
+    fn embedded_preview_picks_largest_jpeg() {
+        let mut file = b"II*\0 fake raw container ".to_vec();
+        file.extend(jpeg(80, 60));
+        file.extend([0u8, 0xFF, 0xD8, 0xFF, 0x00, 0x13]); // broken candidate
+        file.extend(jpeg(320, 200));
+        file.extend(b"trailing sensor data");
+        let dir = std::env::temp_dir().join(format!("openpano-prev-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("x.dng");
+        std::fs::write(&p, &file).unwrap();
+        let prev = embedded_preview(&p).expect("preview");
+        assert_eq!((prev.width(), prev.height()), (320, 200));
+        let t = preview_thumb(&p, 160, 6).expect("thumb");
+        assert_eq!(t.width(), 100); // rotated 90°: 200x320 -> 100x160
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn no_preview_in_plain_data() {
+        let dir = std::env::temp_dir().join(format!("openpano-noprev-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("y.dng");
+        std::fs::write(&p, vec![7u8; 4096]).unwrap();
+        assert!(embedded_preview(&p).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
