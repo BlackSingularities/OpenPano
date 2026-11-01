@@ -51,7 +51,7 @@ OPTIONS:
         --scale <PCT>          Output resolution in percent of native [default: 100]
         --max-mp <MP>          Output size limit in megapixels [default: 300]
     -q, --quality <1-100>      JPEG quality [default: 95]
-        --format <FMT>         auto | jpeg | tiff | png | dng   [default: from extension]
+        --format <FMT>         auto | jpeg | tiff | png | exr | dng   [default: from extension]
         --blend <MODE>         multiband | feather | seams
         --no-crop              Disable automatic cropping
         --no-exposure          Disable exposure compensation
