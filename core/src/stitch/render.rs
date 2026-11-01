@@ -55,6 +55,8 @@ pub struct RenderSettings {
     pub flip_v: bool,
     /// Route seams around moving objects / parallax (graph cut).
     pub smart_seams: bool,
+    /// Prefer well-exposed source pixels when choosing seams (exposure fusion of brackets).
+    pub exposure_fusion: bool,
 }
 
 impl Default for RenderSettings {
@@ -78,6 +80,7 @@ impl Default for RenderSettings {
             flip_h: false,
             flip_v: false,
             smart_seams: true,
+            exposure_fusion: false,
         }
     }
 }
@@ -450,11 +453,21 @@ pub fn render(
         let (x0, y0, x1, y1) = canvas.boxes[i].unwrap();
         let lrows = &mut label[y0 * cw..y1 * cw];
         let brows = &mut best[y0 * cw..y1 * cw];
+        let fsrc = if st.exposure_fusion { seam_src.and_then(|f| f(i)) } else { None };
         lrows.par_chunks_mut(cw).zip(brows.par_chunks_mut(cw)).enumerate().for_each(|(ry, (lr, br))| {
             let y = (y0 + ry) as f64;
             for x in x0..x1 {
                 let Some(d) = canvas.pixel_dir(x as f64, y) else { continue };
-                if let Some((_, _, w)) = mapper.map(&d) {
+                if let Some((ix, iy, mut w)) = mapper.map(&d) {
+                    if let Some(src) = &fsrc {
+                        let sx = ix * src.scale + (src.img.w as f64 - 1.0) / 2.0;
+                        let sy = iy * src.scale + (src.img.h as f64 - 1.0) / 2.0;
+                        if let Some(p) = src.img.sample(sx as f32, sy as f32) {
+                            // well-exposedness (Mertens): Gaussian around mid-grey in display space
+                            let v = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]).max(0.0).powf(1.0 / 2.2);
+                            w *= (-(v - 0.5) * (v - 0.5) / 0.08).exp() + 1e-3;
+                        }
+                    }
                     if w > br[x] {
                         br[x] = w;
                         lr[x] = i as u16;

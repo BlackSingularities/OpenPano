@@ -38,6 +38,7 @@ export interface RenderSettings {
   level_roll: number;
   circular_fisheye: boolean;
   bicubic: boolean;
+  exposure_fusion?: boolean;
   flip_h: boolean;
   flip_v: boolean;
 }
@@ -80,6 +81,7 @@ export const defaultRender = (): RenderSettings => ({
   level_roll: 0,
   circular_fisheye: false,
   bicubic: true,
+  exposure_fusion: false,
   flip_h: false,
   flip_v: false,
 });

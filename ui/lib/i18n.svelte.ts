@@ -173,6 +173,8 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   langAuto: ["Auto", "Auto"],
+  fusion: ["Fuzja ekspozycji (bracketing)", "Exposure fusion (brackets)"],
+  h_fusion: ["Przy zdjęciach z bracketingiem wybiera najlepiej naświetlone fragmenty każdego kadru – przepalone niebo i zbyt ciemne cienie są zastępowane innymi ekspozycjami.", "With bracketed shots, picks the best-exposed parts of each frame – blown skies and crushed shadows are replaced by other exposures."],
   ev: ["Ekspozycja", "Exposure"],
   h_ev: ["Globalna korekta jasności całej panoramy w działkach EV (dla RAW działa bez utraty jakości).", "Global brightness correction of the whole panorama in EV stops (lossless for RAW)."],
   temperature: ["Temperatura", "Temperature"],

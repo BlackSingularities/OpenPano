@@ -115,6 +115,7 @@
       <Slider label={t("temperature")} tip={t("h_temperature")} bind:value={s.photo.temperature} min={-100} max={100} step={1} oncommit={setPhotometric} />
       <Slider label={t("tint")} tip={t("h_tint")} bind:value={s.photo.tint} min={-100} max={100} step={1} oncommit={setPhotometric} />
       <Switch label={t("bicubic")} tip={t("h_bicubic")} bind:checked={r.bicubic} onchange={persist} />
+      <Switch label={t("fusion")} tip={t("h_fusion")} bind:checked={r.exposure_fusion} onchange={() => (persist(), viewChanged())} />
     </Section>
 
     <Section title={t("secCrop")} tip={t("h_secCrop")} icon="crop">
