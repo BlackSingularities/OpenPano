@@ -159,6 +159,7 @@
           <option value="Jpeg">JPEG · 8-bit sRGB</option>
           <option value="Tiff16">TIFF · 16-bit sRGB</option>
           <option value="Png16">PNG · 16-bit sRGB</option>
+          <option value="Exr">EXR · 32-bit float, linear</option>
           <option value="Dng">{t("dngDesc")}</option>
         </select>
       </Field>
@@ -169,7 +170,7 @@
       <Field label={t("maxMp")} tip={t("h_maxMp")}>
         <input type="number" min="1" max="2000" bind:value={r.max_megapixels} onchange={() => (persist(), viewChanged())} /><span class="muted">MP</span>
       </Field>
-      {#if fmt === "Png16" || fmt === "Tiff16"}
+      {#if fmt === "Png16" || fmt === "Tiff16" || fmt === "Exr"}
         <Switch label={t("transparent")} tip={t("h_transparent")} bind:checked={s.output.transparent} onchange={persist} />
       {/if}
       {#if effectiveProjection() === "Equirectangular"}
@@ -187,7 +188,7 @@
         </div>
       {/if}
       <button data-tip={t("h_render")} class="btn primary lg wide" disabled={!app.align || busyBlocking()} onclick={renderAndSave}>
-        <Icon name="download" size={17} />{t("renderSave")} · {fmt === "Dng" ? "DNG" : fmt === "Jpeg" ? "JPEG" : fmt === "Tiff16" ? "TIFF" : "PNG"}
+        <Icon name="download" size={17} />{t("renderSave")} · {fmt === "Dng" ? "DNG" : fmt === "Jpeg" ? "JPEG" : fmt === "Tiff16" ? "TIFF" : fmt === "Exr" ? "EXR" : "PNG"}
       </button>
     </Section>
   </div>

@@ -16,7 +16,7 @@ import { kindOf, wrap180, type Kind } from "./composition";
 export type CropMode = "Auto" | "None" | "Manual";
 export type Blend = "Multiband" | "Feather" | "Seams";
 export type Strategy = "Auto" | "AllPairs" | "Sequential";
-export type OutFormat = "Auto" | "Jpeg" | "Tiff16" | "Png16" | "Dng";
+export type OutFormat = "Auto" | "Jpeg" | "Tiff16" | "Png16" | "Exr" | "Dng";
 
 export interface RenderSettings {
   auto_projection: boolean;
@@ -649,7 +649,7 @@ export function resolvedFormat(): Exclude<OutFormat, "Auto"> {
   return f;
 }
 
-const EXT: Record<string, string> = { Jpeg: "jpg", Tiff16: "tif", Png16: "png", Dng: "dng" };
+const EXT: Record<string, string> = { Jpeg: "jpg", Tiff16: "tif", Png16: "png", Exr: "exr", Dng: "dng" };
 
 export function viewSnapshot(): string {
   return JSON.stringify({ r: $state.snapshot(S.settings.render), w: app.workVersion });

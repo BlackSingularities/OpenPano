@@ -17,11 +17,13 @@ pub enum OutputFormat {
     Jpeg,
     Tiff16,
     Png16,
+    /// OpenEXR, 32-bit float, linear light (HDR compositing / VFX).
+    Exr,
     Dng,
 }
 
 impl OutputFormat {
-    pub const ALL: [OutputFormat; 5] = [OutputFormat::Auto, OutputFormat::Jpeg, OutputFormat::Tiff16, OutputFormat::Png16, OutputFormat::Dng];
+    pub const ALL: [OutputFormat; 6] = [OutputFormat::Auto, OutputFormat::Jpeg, OutputFormat::Tiff16, OutputFormat::Png16, OutputFormat::Exr, OutputFormat::Dng];
 
     pub fn resolve(self, any_raw: bool) -> OutputFormat {
         match self {
@@ -41,6 +43,7 @@ impl OutputFormat {
             OutputFormat::Auto | OutputFormat::Jpeg => "jpg",
             OutputFormat::Tiff16 => "tif",
             OutputFormat::Png16 => "png",
+            OutputFormat::Exr => "exr",
             OutputFormat::Dng => "dng",
         }
     }
@@ -124,6 +127,7 @@ pub fn save(path: &Path, out: &RenderOutput, fmt: OutputFormat, st: &OutputSetti
             Ok(())
         }
         OutputFormat::Png16 => save_16(path, &out.image, alpha, image::ImageFormat::Png),
+        OutputFormat::Exr => save_exr(path, &out.image, alpha),
         OutputFormat::Tiff16 => save_16(path, &out.image, alpha, image::ImageFormat::Tiff),
         OutputFormat::Dng => save_dng(path, &out.image, info, xmp.as_deref()),
     }
@@ -245,6 +249,24 @@ fn save_16(path: &Path, img: &RgbImage, alpha: Option<&[u8]>, fmt: image::ImageF
             ib.save_with_format(path, fmt).with_context(|| format!("{}", path.display()))?;
         }
     }
+    Ok(())
+}
+
+fn save_exr(path: &Path, img: &RgbImage, alpha: Option<&[u8]>) -> Result<()> {
+    let (w, h) = (img.w as u32, img.h as u32);
+    let mut buf = vec![0f32; img.w * img.h * 4];
+    buf.par_chunks_mut(4).enumerate().for_each(|(i, o)| {
+        let p = img.data[i];
+        o[0] = p[0];
+        o[1] = p[1];
+        o[2] = p[2];
+        o[3] = match alpha {
+            Some(a) if a[i] == 0 => 0.0,
+            _ => 1.0,
+        };
+    });
+    let ib: image::Rgba32FImage = image::ImageBuffer::from_raw(w, h, buf).context("buffer")?;
+    image::DynamicImage::ImageRgba32F(ib).save_with_format(path, image::ImageFormat::OpenExr).with_context(|| format!("{}", path.display()))?;
     Ok(())
 }
 

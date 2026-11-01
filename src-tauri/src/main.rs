@@ -163,6 +163,7 @@ OPTIONS:
                         "jpeg" | "jpg" => OutputFormat::Jpeg,
                         "tiff" | "tif" => OutputFormat::Tiff16,
                         "png" => OutputFormat::Png16,
+                        "exr" => OutputFormat::Exr,
                         "dng" => OutputFormat::Dng,
                         _ => OutputFormat::Auto,
                     })
@@ -212,6 +213,7 @@ OPTIONS:
             Some("dng") => OutputFormat::Dng,
             Some("tif") | Some("tiff") => OutputFormat::Tiff16,
             Some("png") => OutputFormat::Png16,
+            Some("exr") => OutputFormat::Exr,
             Some("jpg") | Some("jpeg") => OutputFormat::Jpeg,
             _ => OutputFormat::Auto,
         });

@@ -21,7 +21,7 @@
     const r: string[] = [];
     if (unaligned.length) r.push(`${t("qNotConnected")}: ${nameList(unaligned)}`);
     if (badPairs) r.push(`${badPairs} × ${t("qBadPairs")}`);
-    if (al.issues.includes("highError")) r.push(`${t("qHighError")} (${al.rms.toFixed(1)} px)`);
+    if (al.issues.includes("highError")) r.push(`${t("qHighError")} (${al.rms.toFixed(1)} px) – ${t("qParallax")}`);
     if (al.issues.includes("weakPairs") && !badPairs) r.push(t("qWeak"));
     return r.join(" · ");
   });

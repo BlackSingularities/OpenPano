@@ -173,6 +173,7 @@ const D = {
   qHigh: ["Wysoka", "High"],
   language: ["Język", "Language"],
   langAuto: ["Auto", "Auto"],
+  qParallax: ["prawdopodobna paralaksa – obracaj aparat wokół punktu nodalnego obiektywu", "likely parallax – rotate the camera around the lens nodal point"],
   projectOpen: ["Otwórz projekt…", "Open project…"],
   projectSave: ["Zapisz projekt…", "Save project…"],
   projectSaved: ["Zapisano projekt", "Project saved"],
