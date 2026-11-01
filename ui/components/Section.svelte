@@ -5,7 +5,7 @@
 </script>
 
 <section class:open>
-  <button class="head" data-tip={tip || undefined} onclick={() => (open = !open)}>
+  <button class="head" data-tip={tip || undefined} aria-label={tip || undefined} onclick={() => (open = !open)}>
     <span class="ic"><Icon name={icon} size={16} /></span>
     <span class="title">{title}</span>
     {#if badge}<span class="badge">{badge}</span>{/if}

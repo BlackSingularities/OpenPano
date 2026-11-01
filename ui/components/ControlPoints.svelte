@@ -387,9 +387,9 @@
               >
                 {#each ok as im}<option value={im.id}>{im.name}</option>{/each}
               </select>
-              <button class="btn sm icon" data-tip={t("zoomOut")} onclick={() => zoomBy(pane.v, 1 / 1.6)}><Icon name="zoomOut" size={14} /></button>
-              <button class="btn sm icon" data-tip={t("zoomIn")} onclick={() => zoomBy(pane.v, 1.6)}><Icon name="zoomIn" size={14} /></button>
-              {#if side === "a"}<button class="btn sm icon" data-tip={t("cpSwap")} onclick={swapPair}><Icon name="flipH" size={14} /></button>{/if}
+              <button class="btn sm icon" data-tip={t("zoomOut")} aria-label={t("zoomOut")} onclick={() => zoomBy(pane.v, 1 / 1.6)}><Icon name="zoomOut" size={14} /></button>
+              <button class="btn sm icon" data-tip={t("zoomIn")} aria-label={t("zoomIn")} onclick={() => zoomBy(pane.v, 1.6)}><Icon name="zoomIn" size={14} /></button>
+              {#if side === "a"}<button class="btn sm icon" data-tip={t("cpSwap")} aria-label={t("cpSwap")} onclick={swapPair}><Icon name="flipH" size={14} /></button>{/if}
             </div>
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div

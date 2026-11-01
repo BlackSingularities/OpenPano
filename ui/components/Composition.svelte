@@ -70,7 +70,7 @@
     <Field label={t("cVariant")}>
       <div class="seg full">
         {#each variants as p}
-          <button class:on={proj === p} data-tip={projDesc(p)} onclick={() => chooseProjection(p as Projection)}>{projName(p)}</button>
+          <button class:on={proj === p} data-tip={projDesc(p)} aria-label={projDesc(p)} onclick={() => chooseProjection(p as Projection)}>{projName(p)}</button>
         {/each}
       </div>
     </Field>
@@ -83,12 +83,12 @@
   {#if kind === "strip"}
     <Slider label={t("cCentre")} tip={t("h_cCentre")} bind:value={r.yaw} min={-180} max={180} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
     <div class="btnrow">
-      <button class="btn sm" class:active={vw.tool === "center"} data-tip={t("toolCenterHint")} onclick={() => useTool("center")}><Icon name="target" size={15} />{t("cPickCentre")}</button>
+      <button class="btn sm" class:active={vw.tool === "center"} data-tip={t("toolCenterHint")} aria-label={t("toolCenterHint")} onclick={() => useTool("center")}><Icon name="target" size={15} />{t("cPickCentre")}</button>
     </div>
     <div class="sub" data-tip={t("h_cLevel")}>{t("cLevel")}</div>
     <div class="btnrow">
-      <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} onclick={() => useTool("horizon")}><Icon name="horizon" size={15} />{t("cByHorizon")}</button>
-      <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} onclick={() => useTool("vertical")}><Icon name="vertical" size={15} />{t("cByVertical")}</button>
+      <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} aria-label={t("toolHorizonHint")} onclick={() => useTool("horizon")}><Icon name="horizon" size={15} />{t("cByHorizon")}</button>
+      <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} aria-label={t("toolVerticalHint")} onclick={() => useTool("vertical")}><Icon name="vertical" size={15} />{t("cByVertical")}</button>
     </div>
     <Slider label={t("cTilt")} tip={t("h_cTilt")} bind:value={r.pitch} min={-45} max={45} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
     <Slider label={t("cSlant")} tip={t("h_cSlant")} bind:value={r.roll} min={-45} max={45} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
@@ -101,9 +101,9 @@
     <Slider label={t("cLookV")} tip={t("h_cLookV")} value={off.pitch} min={-90} max={90} step={0.1} decimals={1} unit="°" onchange={(v) => (setLookOffsets(v, null), viewChanged())} />
     <Slider label={t("cFrameRot")} tip={t("h_cFrameRot")} value={off.roll} min={-180} max={180} step={0.1} decimals={1} unit="°" onchange={(v) => (setLookOffsets(null, v), viewChanged())} />
     <div class="btnrow">
-      <button class="btn sm" data-tip={t("rotL")} onclick={() => (setLookOffsets(null, wrap180(off.roll + 90)), viewChanged())}><Icon name="rotl" size={15} />90°</button>
-      <button class="btn sm" data-tip={t("rotR")} onclick={() => (setLookOffsets(null, wrap180(off.roll - 90)), viewChanged())}><Icon name="rotr" size={15} />90°</button>
-      <button class="btn sm" class:active={vw.tool === "center"} data-tip={t("toolCenterHint")} onclick={() => useTool("center")}><Icon name="target" size={15} />{t("cPickCentre")}</button>
+      <button class="btn sm" data-tip={t("rotL")} aria-label={t("rotL")} onclick={() => (setLookOffsets(null, wrap180(off.roll + 90)), viewChanged())}><Icon name="rotl" size={15} />90°</button>
+      <button class="btn sm" data-tip={t("rotR")} aria-label={t("rotR")} onclick={() => (setLookOffsets(null, wrap180(off.roll - 90)), viewChanged())}><Icon name="rotr" size={15} />90°</button>
+      <button class="btn sm" class:active={vw.tool === "center"} data-tip={t("toolCenterHint")} aria-label={t("toolCenterHint")} onclick={() => useTool("center")}><Icon name="target" size={15} />{t("cPickCentre")}</button>
     </div>
     {#if hasFov(proj)}
       <Field label={t("cFov")} tip={t("h_cFov")}>
@@ -118,8 +118,8 @@
     {/if}
     <div class="sub" data-tip={t("h_cLevel")}>{t("cLevel")}</div>
     <div class="btnrow">
-      <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} onclick={() => useTool("horizon")}><Icon name="horizon" size={15} />{t("cByHorizon")}</button>
-      <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} onclick={() => useTool("vertical")}><Icon name="vertical" size={15} />{t("cByVertical")}</button>
+      <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} aria-label={t("toolHorizonHint")} onclick={() => useTool("horizon")}><Icon name="horizon" size={15} />{t("cByHorizon")}</button>
+      <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} aria-label={t("toolVerticalHint")} onclick={() => useTool("vertical")}><Icon name="vertical" size={15} />{t("cByVertical")}</button>
     </div>
   {:else}
     <Slider label={t("cPlanetSpin")} tip={t("h_cPlanetSpin")} bind:value={r.yaw} min={-180} max={180} step={0.1} decimals={1} unit="°" onchange={() => viewChanged()} />
@@ -136,13 +136,13 @@
     <Switch label={t("cTunnel")} tip={t("h_cTunnel")} checked={tunnel} onchange={(v) => (setLookOffsets(-off.pitch, v ? 180 : 0), viewChanged())} />
     <div class="sub" data-tip={t("h_cLevel")}>{t("cLevel")}</div>
     <div class="btnrow">
-      <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} onclick={() => useTool("horizon")}><Icon name="horizon" size={15} />{t("cByHorizon")}</button>
-      <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} onclick={() => useTool("vertical")}><Icon name="vertical" size={15} />{t("cByVertical")}</button>
+      <button class="btn sm" class:active={vw.tool === "horizon"} data-tip={t("toolHorizonHint")} aria-label={t("toolHorizonHint")} onclick={() => useTool("horizon")}><Icon name="horizon" size={15} />{t("cByHorizon")}</button>
+      <button class="btn sm" class:active={vw.tool === "vertical"} data-tip={t("toolVerticalHint")} aria-label={t("toolVerticalHint")} onclick={() => useTool("vertical")}><Icon name="vertical" size={15} />{t("cByVertical")}</button>
     </div>
   {/if}
   <div class="btnrow end">
-    <button class="btn sm icon" class:active={r.flip_h} data-tip={t("flipH")} onclick={() => ((r.flip_h = !r.flip_h), viewChanged())}><Icon name="flipH" size={15} /></button>
-    <button class="btn sm icon" class:active={r.flip_v} data-tip={t("flipV")} onclick={() => ((r.flip_v = !r.flip_v), viewChanged())}><Icon name="flipV" size={15} /></button>
+    <button class="btn sm icon" class:active={r.flip_h} data-tip={t("flipH")} aria-label={t("flipH")} onclick={() => ((r.flip_h = !r.flip_h), viewChanged())}><Icon name="flipH" size={15} /></button>
+    <button class="btn sm icon" class:active={r.flip_v} data-tip={t("flipV")} aria-label={t("flipV")} onclick={() => ((r.flip_v = !r.flip_v), viewChanged())}><Icon name="flipV" size={15} /></button>
     <span class="grow"></span>
     <button class="btn sm ghost" data-tip={t("h_resetView")} onclick={resetView}><Icon name="reset" size={15} />{t("resetView")}</button>
   </div>

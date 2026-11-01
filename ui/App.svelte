@@ -222,7 +222,7 @@
 
       <div class="actions">
         {#if updPill && upd.available}
-          <button class="btn sm updpill" data-tip={t("updAvailable")} onclick={() => ((updHidden = false), (S.settings.ui.skippedVersion = ""), persist())}>
+          <button class="btn sm updpill" data-tip={t("updAvailable")} aria-label={t("updAvailable")} onclick={() => ((updHidden = false), (S.settings.ui.skippedVersion = ""), persist())}>
             <span class="udot2"></span>{#if !compact}{upd.available.version}{:else}<Icon name="download" size={14} />{/if}
           </button>
         {/if}
@@ -233,7 +233,7 @@
         <div class="menuwrap">
           <button
             class="btn ghost icon"
-            data-tip={t("menu")}
+            data-tip={t("menu")} aria-label={t("menu")}
             onclick={(e) => {
               e.stopPropagation();
               menuOpen = !menuOpen;
@@ -262,7 +262,7 @@
                   <button
                     class="swatch"
                     class:on={S.settings.ui.theme === th.id}
-                    data-tip={t(("theme_" + th.id) as any)}
+                    data-tip={t(("theme_" + th.id) as any)} aria-label={t(("theme_" + th.id) as any)}
                     style="background:{th.id === 'custom' ? S.settings.ui.customColor : th.swatch}"
                     onclick={() => setTheme(th.id as ThemeId)}
                   >{#if th.id === "custom"}<span class="rgb"></span>{/if}</button>

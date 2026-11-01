@@ -6,7 +6,7 @@
   class="sw"
   class:on={checked}
   {disabled}
-  data-tip={tip || undefined}
+  data-tip={tip || undefined} aria-label={tip || undefined}
   role="switch"
   aria-checked={checked}
   onclick={() => {

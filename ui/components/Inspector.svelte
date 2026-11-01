@@ -129,7 +129,7 @@
           }}>{t("cropManual")}</button
         >
       </div>
-      <button class="btn sm" data-tip={t("toolCropHint")} class:active={vw.tool === "crop"} onclick={() => (vw.tool = "crop")}><Icon name="crop" size={15} />{t("cropTool")}</button>
+      <button class="btn sm" data-tip={t("toolCropHint")} aria-label={t("toolCropHint")} class:active={vw.tool === "crop"} onclick={() => (vw.tool = "crop")}><Icon name="crop" size={15} />{t("cropTool")}</button>
       {#if r.crop === "Manual"}
         {#each [t("left"), t("top"), t("right"), t("bottom")] as lbl, k}
           <Slider

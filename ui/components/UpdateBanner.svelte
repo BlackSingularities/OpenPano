@@ -27,7 +27,7 @@
         <button class="btn ghost sm" onclick={skip}>{t("updSkip")}</button>
       </div>
     </div>
-    <button class="btn ghost sm icon" data-tip={t("updLater")} onclick={() => (hidden = true)}><Icon name="x" size={14} /></button>
+    <button class="btn ghost sm icon" data-tip={t("updLater")} aria-label={t("updLater")} onclick={() => (hidden = true)}><Icon name="x" size={14} /></button>
   </div>
 {/if}
 

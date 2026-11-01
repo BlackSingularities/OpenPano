@@ -36,8 +36,8 @@
       {#if app.images.length}<span class="count">{enabled}/{app.images.length}</span>{/if}
     </div>
     <div class="acts">
-      <button class="btn ghost sm icon" data-tip={t("addImages")} onclick={pickFiles}><Icon name="plus" size={16} /></button>
-      <button class="btn ghost sm icon" data-tip={t("addFolder")} onclick={pickFolder}><Icon name="folder" size={16} /></button>
+      <button class="btn ghost sm icon" data-tip={t("addImages")} aria-label={t("addImages")} onclick={pickFiles}><Icon name="plus" size={16} /></button>
+      <button class="btn ghost sm icon" data-tip={t("addFolder")} aria-label={t("addFolder")} onclick={pickFolder}><Icon name="folder" size={16} /></button>
     </div>
   </div>
   {#if app.images.length}
@@ -104,7 +104,7 @@
         <button
           class="check"
           class:on={it.enabled}
-          data-tip={t("useImage")}
+          data-tip={t("useImage")} aria-label={t("useImage")}
           disabled={busyBlocking()}
           onclick={(e) => {
             e.stopPropagation();

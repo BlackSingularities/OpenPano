@@ -35,7 +35,7 @@
       <span>{reasons}. {t("qHint")}</span>
     </div>
     <button class="btn primary sm" onclick={() => (app.dialogs.cp = true)}><Icon name="target" size={14} />{t("cpOpen")}</button>
-    <button class="btn ghost sm icon" data-tip={t("close")} onclick={() => (hidden = key)}><Icon name="x" size={14} /></button>
+    <button class="btn ghost sm icon" data-tip={t("close")} aria-label={t("close")} onclick={() => (hidden = key)}><Icon name="x" size={14} /></button>
   </div>
 {/if}
 

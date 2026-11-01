@@ -69,14 +69,14 @@
           class="nb"
           disabled={b.d[1] !== 0 && currentKind() === "strip"}
           class:on={active === b.id}
-          data-tip={b.tip()}
+          data-tip={b.tip()} aria-label={b.tip()}
           onpointerdown={(e) => down(e, b.id, b.d[0], b.d[1], b.d[2])}
           onpointerup={up}
           onpointercancel={up}
           onlostpointercapture={up}><Icon name={b.icon} size={18} /></button
         >
       {:else}
-        <button class="nb sec" data-tip={b.tip()} onclick={() => click(b.id)}><Icon name={b.icon} size={17} /></button>
+        <button class="nb sec" data-tip={b.tip()} aria-label={b.tip()} onclick={() => click(b.id)}><Icon name={b.icon} size={17} /></button>
       {/if}
     {/each}
   </div>

@@ -557,24 +557,24 @@
   <div class="toolbar">
     <div class="seg">
       {#each tools as tl}
-        <button class:on={vw.tool === tl.id} data-tip="{tl.hint()} ({tl.key})" onclick={() => ((vw.tool = tl.id), (points = []))}>
+        <button class:on={vw.tool === tl.id} data-tip="{tl.hint()} ({tl.key})" aria-label="{tl.hint()} ({tl.key})" onclick={() => ((vw.tool = tl.id), (points = []))}>
           <Icon name={tl.icon} size={16} />
           <span class="tl">{tl.label()}</span>
         </button>
       {/each}
     </div>
     <div class="sep"></div>
-    <button class="btn ghost icon" data-tip="{t('undo')} (Ctrl+Z)" disabled={!canUndo()} onclick={undo}><Icon name="undo" size={17} /></button>
-    <button class="btn ghost icon" data-tip="{t('redo')} (Ctrl+Y)" disabled={!canRedo()} onclick={redo}><Icon name="redo" size={17} /></button>
+    <button class="btn ghost icon" data-tip="{t('undo')} (Ctrl+Z)" aria-label="{t('undo')} (Ctrl+Z)" disabled={!canUndo()} onclick={undo}><Icon name="undo" size={17} /></button>
+    <button class="btn ghost icon" data-tip="{t('redo')} (Ctrl+Y)" aria-label="{t('redo')} (Ctrl+Y)" disabled={!canRedo()} onclick={redo}><Icon name="redo" size={17} /></button>
     <div class="grow"></div>
-    <button class="btn ghost icon" class:active={S.settings.ui.showGrid} data-tip={t("gridHint")} onclick={() => ((S.settings.ui.showGrid = !S.settings.ui.showGrid), persist())}><Icon name="grid" size={17} /></button>
-    <button class="btn ghost icon" class:active={S.settings.ui.showOutlines} data-tip={t("outlinesHint")} onclick={() => ((S.settings.ui.showOutlines = !S.settings.ui.showOutlines), persist())}><Icon name="outlines" size={17} /></button>
-    <button class="btn ghost icon" class:active={S.settings.ui.showNav} data-tip={t("navPad")} onclick={() => ((S.settings.ui.showNav = !S.settings.ui.showNav), persist())}><Icon name="compass" size={17} /></button>
+    <button class="btn ghost icon" class:active={S.settings.ui.showGrid} data-tip={t("gridHint")} aria-label={t("gridHint")} onclick={() => ((S.settings.ui.showGrid = !S.settings.ui.showGrid), persist())}><Icon name="grid" size={17} /></button>
+    <button class="btn ghost icon" class:active={S.settings.ui.showOutlines} data-tip={t("outlinesHint")} aria-label={t("outlinesHint")} onclick={() => ((S.settings.ui.showOutlines = !S.settings.ui.showOutlines), persist())}><Icon name="outlines" size={17} /></button>
+    <button class="btn ghost icon" class:active={S.settings.ui.showNav} data-tip={t("navPad")} aria-label={t("navPad")} onclick={() => ((S.settings.ui.showNav = !S.settings.ui.showNav), persist())}><Icon name="compass" size={17} /></button>
     <div class="sep"></div>
-    <button class="btn ghost icon" data-tip={t("zoomOut")} onclick={() => (vw.zoom = Math.max(0.2, vw.zoom / 1.25))}><Icon name="zoomOut" size={17} /></button>
-    <button class="btn ghost sm zoom" data-tip={t("fit")} onclick={fitView}>{Math.round(vw.zoom * 100)}%</button>
-    <button class="btn ghost icon" data-tip={t("zoomIn")} onclick={() => (vw.zoom = Math.min(40, vw.zoom * 1.25))}><Icon name="zoomIn" size={17} /></button>
-    <button class="btn ghost icon" data-tip="{t('fit')} (F)" onclick={fitView}><Icon name="fit" size={17} /></button>
+    <button class="btn ghost icon" data-tip={t("zoomOut")} aria-label={t("zoomOut")} onclick={() => (vw.zoom = Math.max(0.2, vw.zoom / 1.25))}><Icon name="zoomOut" size={17} /></button>
+    <button class="btn ghost sm zoom" data-tip={t("fit")} aria-label={t("fit")} onclick={fitView}>{Math.round(vw.zoom * 100)}%</button>
+    <button class="btn ghost icon" data-tip={t("zoomIn")} aria-label={t("zoomIn")} onclick={() => (vw.zoom = Math.min(40, vw.zoom * 1.25))}><Icon name="zoomIn" size={17} /></button>
+    <button class="btn ghost icon" data-tip="{t('fit')} (F)" aria-label="{t('fit')} (F)" onclick={fitView}><Icon name="fit" size={17} /></button>
   </div>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
