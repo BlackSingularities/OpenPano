@@ -163,6 +163,10 @@ pub fn coverage(al: &Alignment) -> (f64, f64, f64) {
 
 /// Pick a projection suited to the panorama's coverage.
 pub fn auto_projection(al: &Alignment) -> Projection {
+    if al.flat {
+        // A flat mosaic is a plane seen head-on: only the rectilinear projection keeps it undistorted.
+        return Projection::Rectilinear;
+    }
     let (lon, lat0, lat1) = coverage(al);
     let lat = lat1 - lat0;
     if lon >= 300.0 {

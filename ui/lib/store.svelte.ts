@@ -55,6 +55,8 @@ export interface Settings {
     optimize_focal: boolean;
     straighten: boolean;
     ransac_threshold_px: number;
+    /** Flat mosaic of tiles (scans, satellite images, map tiles) instead of a panorama. */
+    flat: boolean;
   };
   manualFov: boolean;
   fovDeg: number;
@@ -89,7 +91,7 @@ export const defaultRender = (): RenderSettings => ({
 
 const defaults = (): Settings => ({
   lang: "auto",
-  align: { lens: "Rectilinear", manual_hfov: null, max_features: 2500, strategy: "Auto", window: 3, optimize_focal: true, straighten: true, ransac_threshold_px: 3 },
+  align: { lens: "Rectilinear", manual_hfov: null, max_features: 2500, strategy: "Auto", window: 3, optimize_focal: true, straighten: true, ransac_threshold_px: 3, flat: false },
   manualFov: false,
   fovDeg: 60,
   photo: { exposure: true, color: true, vignetting: true, ev: 0, temperature: 0, tint: 0 },

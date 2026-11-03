@@ -50,6 +50,13 @@
 <aside class="insp">
   <div class="scroll">
     <Section title={t("secLens")} tip={t("h_secLens")} icon="lens" badge={app.align ? `${alignedCount}/${app.align.cameras.length}` : ""}>
+      <Field label={t("sceneType")} tip={t("h_sceneType")}>
+        <div class="seg">
+          <button class:on={!s.align.flat} onclick={() => ((s.align.flat = false), persist())}>{t("scenePano")}</button>
+          <button class:on={s.align.flat} onclick={() => ((s.align.flat = true), persist())}>{t("sceneFlat")}</button>
+        </div>
+      </Field>
+      {#if !s.align.flat}
       <Field label={t("lens")} tip={t("h_lens")}>
         <select bind:value={s.align.lens} onchange={persist}>
           {#each lenses as l}<option value={l}>{lensName(l)}</option>{/each}
@@ -64,6 +71,7 @@
           <input type="number" min="5" max="360" step="0.5" bind:value={s.fovDeg} onchange={persist} /><span class="muted">°</span>
         {/if}
       </Field>
+      {/if}
       <Slider label={t("features")} tip={t("h_features")} bind:value={s.align.max_features} min={500} max={8000} step={250} oncommit={persist} />
       <Field label={t("matching")} tip={t("h_matching")}>
         <select bind:value={s.align.strategy} onchange={persist}>
@@ -76,9 +84,11 @@
         <Slider label={t("neighbours")} tip={t("h_neighbours")} bind:value={s.align.window} min={1} max={10} oncommit={persist} />
       {/if}
       <Slider label={t("ransac")} tip={t("h_ransac")} bind:value={s.align.ransac_threshold_px} min={1} max={10} step={0.5} decimals={1} unit="px" oncommit={persist} />
-      <Switch label={t("optimizeFocal")} tip={t("h_optimizeFocal")} bind:checked={s.align.optimize_focal} onchange={persist} />
-      <Switch label={t("straighten")} tip={t("h_straighten")} bind:checked={s.align.straighten} onchange={persist} />
-      {#if s.align.lens !== "Rectilinear"}
+      {#if !s.align.flat}
+        <Switch label={t("optimizeFocal")} tip={t("h_optimizeFocal")} bind:checked={s.align.optimize_focal} onchange={persist} />
+        <Switch label={t("straighten")} tip={t("h_straighten")} bind:checked={s.align.straighten} onchange={persist} />
+      {/if}
+      {#if s.align.lens !== "Rectilinear" && !s.align.flat}
         <Switch label={t("circularFisheye")} tip={t("h_circularFisheye")} bind:checked={r.circular_fisheye} onchange={rebuild} />
       {/if}
       <button data-tip={t("h_align")} class="btn blue lg wide" disabled={busyBlocking() || readyIds().length < 2} onclick={align}>

@@ -57,6 +57,7 @@ OPTIONS:
         --no-exposure          Disable exposure compensation
         --no-vignetting        Disable vignetting correction
         --no-straighten        Disable horizon levelling
+        --flat                 Flat mosaic: tiles of one plane (scans, satellite images, map tiles)
         --no-distortion        Do not estimate lens distortion
         --no-smart-seams       Plain distance seams instead of ghost-aware graph cut
         --yaw/--pitch/--roll <DEG>  View rotation
@@ -182,6 +183,7 @@ OPTIONS:
                 }
                 "--no-vignetting" => ph.vignetting = false,
                 "--no-straighten" => st.straighten = false,
+                "--flat" => st.flat = true,
                 "--no-distortion" => st.optimize_distortion = false,
                 "--no-smart-seams" => rs.smart_seams = false,
                 "--yaw" => rs.yaw = num!(a),

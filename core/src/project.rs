@@ -110,6 +110,14 @@ pub fn run_align_diag(
     cancel: &Cancel,
     diag: &mut Vec<align::PairDiag>,
 ) -> Result<Aligned, StitchError> {
+    // Tiles of a flat mosaic carry no lens geometry of their own.
+    let flat_st;
+    let st = if st.flat {
+        flat_st = AlignSettings { lens: crate::stitch::geometry::LensType::Rectilinear, ..st.clone() };
+        &flat_st
+    } else {
+        st
+    };
     progress.set_stage(crate::i18n::tr(crate::i18n::Key::StageFeatures));
     let done = std::sync::atomic::AtomicUsize::new(0);
     let n = works.len();
@@ -150,7 +158,7 @@ pub fn run_align_diag(
     let work: Vec<RgbImage> = works.iter().map(|w| w.img.clone()).collect();
     let scales: Vec<f64> = works.iter().map(|w| w.scale).collect();
     let photo = apply_global(
-        photometric::estimate(&alignment, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting }),
+        photometric::estimate(&alignment, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting && !alignment.flat }),
         ph,
     );
     Ok(Aligned { alignment, photo })
@@ -160,7 +168,7 @@ pub fn run_align_diag(
 pub fn recompute_photo(works: &[Arc<WorkImage>], al: &Alignment, ph: &PhotoOptions) -> Photometric {
     let work: Vec<RgbImage> = works.iter().map(|w| w.img.clone()).collect();
     let scales: Vec<f64> = works.iter().map(|w| w.scale).collect();
-    apply_global(photometric::estimate(al, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting }), ph)
+    apply_global(photometric::estimate(al, &work, &scales, &PhotoSettings { exposure: ph.exposure, color: ph.color, vignetting: ph.vignetting && !al.flat }), ph)
 }
 
 /// Render the blended panorama from the working images into an equirectangular map of about

@@ -37,6 +37,7 @@ OpenPano łączy serie zdjęć w panoramy: sferyczne 360°×180°, cylindryczne,
 - **Mieszanie wielopasmowe** (piramidy Laplace'a) z **inteligentnymi szwami** (graph-cut). Szew omija poruszające się obiekty i paralaksę, więc nie ma „duchów”.
 - **Korekcja dystorsji obiektywu** (k1, k2) liczona automatycznie oraz odporne wyznaczanie kąta widzenia bez EXIF.
 - **Płynny szew 360°:** mieszanie przechodzi przez granicę ±180° bez widocznego łączenia.
+- **Mozaiki z kafelków:** tryb „Mozaika (kafelki)” (CLI: `--flat`) skleja płaskie kawałki – zdjęcia satelitarne, kafelki mapy, skany, zrzuty ekranu – przesuwając je bez perspektywy i zniekształceń.
 - **Ocena jakości dopasowania** (0–100). Gdy jest słaba albo któreś zdjęcie się nie połączy, program proponuje **ręczne punkty kontrolne** w edytorze par zdjęć.
 - **Kadrowanie** automatyczne (największy prostokąt bez pustych obszarów) lub ręczne.
 - **Metadane GPano** dla panoram 360°: Google Photos, Facebook i przeglądarki VR rozpoznają je automatycznie.
@@ -71,6 +72,7 @@ OpenPano stitches photo series into panoramas: spherical 360°×180°, cylindric
 - **Output:** **linear DNG** (16-bit float, keeps highlight headroom) when the sources are RAW, **JPEG** otherwise. You can also pick TIFF/PNG 16-bit, optionally with transparency.
 - **11 projections**, rectilinear and fisheye lens models (including circular fisheye).
 - **Alignment:** ORB features, RANSAC, maximum spanning tree and Levenberg–Marquardt bundle adjustment. Focal length comes from EXIF or is estimated automatically.
+- **Flat mosaics:** “Mosaic (tiles)” mode (CLI: `--flat`) joins flat pieces – satellite images, map tiles, scans, screenshots – by shifting them, with no perspective or distortion.
 - **Horizon levelling**, plus interactive yaw/pitch/roll.
 - **Exposure, colour and vignetting compensation**; multi-band blending; automatic or manual crop.
 - **GPano XMP metadata** for 360° viewers.

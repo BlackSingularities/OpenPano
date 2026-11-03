@@ -3,7 +3,7 @@
 //! horizon straightening (wave correction).
 
 use super::features::{match_features, Features};
-use super::geometry::{distort, undistort, LensType, Rot, V3};
+use super::geometry::{distort, rotation_between, undistort, LensType, Rot, V3};
 use super::{Cancel, Progress, StitchError};
 use nalgebra::{DMatrix, DVector, Matrix3};
 use rayon::prelude::*;
@@ -16,6 +16,9 @@ pub enum MatchStrategy {
     AllPairs,
     Sequential,
 }
+
+/// Focal length of flat-mosaic tiles, in multiples of the largest tile side.
+pub const FLAT_FOCAL_FACTOR: f64 = 500.0;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -32,6 +35,10 @@ pub struct AlignSettings {
     pub optimize_distortion: bool,
     pub straighten: bool,
     pub ransac_threshold_px: f64,
+    /// Flat mosaic: the images are tiles of one plane (scans, satellite images, map tiles), so
+    /// they are only shifted, never rotated in perspective. Modelled as a very long common focal
+    /// length, which turns camera rotations into plain translations.
+    pub flat: bool,
 }
 
 impl Default for AlignSettings {
@@ -46,6 +53,7 @@ impl Default for AlignSettings {
             optimize_distortion: true,
             straighten: true,
             ransac_threshold_px: 3.0,
+            flat: false,
         }
     }
 }
@@ -131,6 +139,8 @@ pub struct Alignment {
     pub rms_px: f64,
     pub focal_source: FocalSource,
     pub diag: Vec<PairDiag>,
+    /// Aligned as a flat mosaic (see `AlignSettings::flat`).
+    pub flat: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -258,7 +268,13 @@ pub fn align_with_diag(
     // ---------- focal lengths ----------
     let mut focal = vec![0f64; n];
     let source;
-    if let Some(hfov) = st.manual_hfov {
+    if st.flat {
+        // One focal for all tiles keeps their pixel scale identical; ~0.1° per tile keeps the
+        // perspective of the rectilinear output negligible even for large grids.
+        let side = imgs.iter().map(|im| im.full_w.max(im.full_h)).max().unwrap_or(1) as f64;
+        focal.iter_mut().for_each(|f| *f = FLAT_FOCAL_FACTOR * side);
+        source = FocalSource::Manual;
+    } else if let Some(hfov) = st.manual_hfov {
         for (k, im) in imgs.iter().enumerate() {
             focal[k] = st.lens.focal_from_hfov(hfov, im.full_w as f64);
         }
@@ -449,7 +465,7 @@ pub fn align_with_diag(
     let rnorm: Vec<f64> = imgs.iter().map(|im| ((im.full_w * im.full_w + im.full_h * im.full_h) as f64).sqrt() / 2.0).collect();
     // First solve without distortion for a stable start, then refine with it.
     let mut rms = bundle_adjust(&pairs, &mut rots, &mut intr, &group_of, &rnorm, reference, st.lens, opt_focal, false, progress, cancel)?;
-    if st.optimize_distortion && pairs.iter().map(|p| p.pts.len()).sum::<usize>() > 60 {
+    if st.optimize_distortion && !st.flat && pairs.iter().map(|p| p.pts.len()).sum::<usize>() > 60 {
         let (r0, i0) = (rots.clone(), intr.clone());
         let rms2 = bundle_adjust(&pairs, &mut rots, &mut intr, &group_of, &rnorm, reference, st.lens, opt_focal, true, progress, cancel)?;
         if rms2 <= rms {
@@ -469,12 +485,16 @@ pub fn align_with_diag(
         })
         .collect();
 
-    if st.straighten {
+    if st.straighten && !st.flat {
         wave_correct(&mut cameras);
     }
-    center_yaw(&mut cameras);
+    if st.flat {
+        center_flat(&mut cameras);
+    } else {
+        center_yaw(&mut cameras);
+    }
     progress.set_fraction(1.0);
-    Ok(Alignment { cameras, lens: st.lens, pairs, rms_px: rms, focal_source: source, diag: diag.clone() })
+    Ok(Alignment { cameras, lens: st.lens, pairs, rms_px: rms, focal_source: source, diag: diag.clone(), flat: st.flat })
 }
 
 /// Returns the horizontal field of view (degrees) maximising rotation-model inliers.
@@ -1105,6 +1125,19 @@ pub fn wave_correct(cams: &mut [Option<Camera>]) {
 }
 
 /// Rotate around the vertical axis so the panorama's coverage is centred (largest gap at ±180°).
+/// Turn a flat mosaic so its mean optical axis looks straight ahead: the plane then faces the
+/// rectilinear output head-on, without keystone.
+fn center_flat(cams: &mut [Option<Camera>]) {
+    let sum: V3 = cams.iter().flatten().map(|c| c.rot * V3::new(0.0, 0.0, 1.0)).sum();
+    if sum.norm() < 1e-12 {
+        return;
+    }
+    let r = rotation_between(&sum.normalize(), &V3::new(0.0, 0.0, 1.0));
+    for c in cams.iter_mut().flatten() {
+        c.rot = r * c.rot;
+    }
+}
+
 pub fn center_yaw(cams: &mut [Option<Camera>]) {
     let mut lons: Vec<f64> = cams
         .iter()
