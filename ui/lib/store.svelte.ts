@@ -211,7 +211,7 @@ export const app = $state({
   log: [] as LogEntry[],
   toasts: [] as Toast[],
   batch: null as { index: number; total: number; cancelled: boolean } | null,
-  dialogs: { about: false, shortcuts: false, log: false, exit: false, cp: false, welcome: false },
+  dialogs: { about: false, shortcuts: false, log: false, exit: false, cp: false, welcome: false, prefs: false },
   manualPoints: [] as ManualPoint[],
   cpPair: null as [number, number] | null,
   report: null as MatchReport | null,

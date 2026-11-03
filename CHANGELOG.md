@@ -1,3 +1,10 @@
+## 2.4.0
+
+- Android: język, motyw, jakość podglądu i automatyczne sprawdzanie aktualizacji przeniesione z menu głównego do „Ustawień aplikacji” (zakładka Ustawienia oraz pozycja w menu).
+- Android: okna dialogowe wysuwają się od dołu ekranu i nie wychodzą poza ekran, większe pola dotyku w menu, przyciski ekranu startowego jeden pod drugim, powiadomienia nie zasłaniają dolnych zakładek.
+- Android: ukryta pozycja „Skróty klawiszowe” (bez klawiatury nie ma sensu).
+- Desktop: ustawienia wyglądu i języka w osobnym oknie „Ustawienia aplikacji” zamiast w rozwijanym menu.
+
 ## 2.3.0
 
 - Windows: wydawany jest tylko instalator (bez wersji portable). Instaluje się dla wszystkich użytkowników w Program Files (z prośbą o uprawnienia administratora), a aktualizacja trafia zawsze w to samo miejsce; dawna instalacja w profilu użytkownika jest usuwana.

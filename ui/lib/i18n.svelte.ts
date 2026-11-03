@@ -164,6 +164,7 @@ const D = {
   needTwo: ["Potrzebne są co najmniej 2 zdjęcia.", "At least 2 images are required."],
   warnUnaligned: ["Część zdjęć nie połączyła się z panoramą (za mało wspólnych punktów).", "Some images could not be connected (not enough common points)."],
   // menu / dialogs
+  appSettings: ["Ustawienia aplikacji", "App settings"],
   menu: ["Menu", "Menu"],
   shortcuts: ["Skróty klawiszowe", "Keyboard shortcuts"],
   log: ["Dziennik zdarzeń", "Event log"],

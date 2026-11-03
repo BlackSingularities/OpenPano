@@ -11,12 +11,12 @@
   import ControlPoints from "./components/ControlPoints.svelte";
   import QualityBanner from "./components/QualityBanner.svelte";
   import UpdateBanner from "./components/UpdateBanner.svelte";
+  import AppSettings from "./components/AppSettings.svelte";
   import { upd, startUpdateChecks, checkForUpdate } from "./lib/updates.svelte";
   import { t } from "./lib/i18n.svelte";
-  import { THEMES, type ThemeId } from "./lib/theme";
   import {
-    S, app, vw, init, setLanguage, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
-    hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, buildSphere, IS_MOBILE, setTheme, toast,
+    S, app, vw, init, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
+    hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, IS_MOBILE, toast,
     saveProject, openProject, saveLog, logText, batchRender, timeGroups,
   } from "./lib/store.svelte";
 
@@ -124,7 +124,7 @@
     if (ctrl && k === "enter") return (e.preventDefault(), align());
     if (ctrl && k === "s") return (e.preventDefault(), renderAndSave());
     if (ctrl || e.altKey) return;
-    if (app.dialogs.exit || app.dialogs.about || app.dialogs.shortcuts || app.dialogs.log || app.dialogs.welcome) {
+    if (app.dialogs.exit || app.dialogs.about || app.dialogs.shortcuts || app.dialogs.log || app.dialogs.welcome || app.dialogs.prefs) {
       if (k === "escape") Object.keys(app.dialogs).forEach((d) => ((app.dialogs as any)[d] = false));
       return;
     }
@@ -187,12 +187,6 @@
     [t("scMiddle"), t("toolPan")],
     [t("scRight") + " / Shift", t("scRoll")],
   ]);
-
-  function setQuality(q: "fast" | "normal" | "high") {
-    S.settings.ui.quality = q;
-    persist();
-    buildSphere();
-  }
 </script>
 
 <svelte:window onkeydown={onKey} onclick={() => (menuOpen = false)} onresize={() => (winW = window.innerWidth)} />
@@ -252,49 +246,13 @@
                 >
               {/if}
               <div class="dsep"></div>
-              <div class="dlabel">{t("previewQuality")}</div>
-              <div class="seg full q">
-                <button class:on={S.settings.ui.quality === "fast"} onclick={() => setQuality("fast")}>{t("qFast")}</button>
-                <button class:on={S.settings.ui.quality === "normal"} onclick={() => setQuality("normal")}>{t("qNormal")}</button>
-                <button class:on={S.settings.ui.quality === "high"} onclick={() => setQuality("high")}>{t("qHigh")}</button>
-              </div>
-              <div class="dsep"></div>
-              <div class="dlabel">{t("theme")}</div>
-              <div class="themes">
-                {#each THEMES.filter((x) => !IS_MOBILE || !x.desktopOnly) as th}
-                  <button
-                    class="swatch"
-                    class:on={S.settings.ui.theme === th.id}
-                    data-tip={t(("theme_" + th.id) as any)} aria-label={t(("theme_" + th.id) as any)}
-                    style="background:{th.id === 'custom' ? S.settings.ui.customColor : th.swatch}"
-                    onclick={() => setTheme(th.id as ThemeId)}
-                  >{#if th.id === "custom"}<span class="rgb"></span>{/if}</button>
-                {/each}
-                {#if !IS_MOBILE}
-                  <label class="picker" data-tip={t("themePick")}>
-                    <input type="color" value={S.settings.ui.customColor} oninput={(e) => setTheme("custom", (e.target as HTMLInputElement).value)} />
-                    RGB
-                  </label>
-                {/if}
-              </div>
-              <div class="tname">{t(("theme_" + S.settings.ui.theme) as any)}</div>
-              <div class="dsep"></div>
-              <div class="dlabel">{t("language")}</div>
-              <div class="seg full q">
-                <button class:on={S.settings.lang === "auto"} onclick={() => setLanguage("auto")}>{t("langAuto")}</button>
-                <button class:on={S.settings.lang === "pl"} onclick={() => setLanguage("pl")}>Polski</button>
-                <button class:on={S.settings.lang === "en"} onclick={() => setLanguage("en")}>English</button>
-                <button class:on={S.settings.lang === "de"} onclick={() => setLanguage("de")}>Deutsch</button>
-              </div>
+              <button onclick={() => ((menuOpen = false), (app.dialogs.prefs = true))}><Icon name="sliders" size={15} />{t("appSettings")}</button>
               <div class="dsep"></div>
               <button onclick={() => ((menuOpen = false), (app.dialogs.welcome = true))}><Icon name="info" size={15} />{t("welcomeMenu")}</button>
-              <button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>
+              {#if !IS_MOBILE}<button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>{/if}
               <button onclick={() => ((menuOpen = false), (app.dialogs.log = true))}><Icon name="list" size={15} />{t("log")}</button>
               <button onclick={() => ((menuOpen = false), openUrl(REPO))}><Icon name="github" size={15} />{t("projectPage")}</button>
               <button disabled={upd.checking} onclick={() => ((menuOpen = false), manualUpdateCheck())}><Icon name="download" size={15} />{upd.checking ? t("updChecking") : t("updCheck")}</button>
-              <label class="dcheck">
-                <input type="checkbox" bind:checked={S.settings.ui.checkUpdates} onchange={persist} />{t("updAuto")}
-              </label>
               <button onclick={() => ((menuOpen = false), (app.dialogs.about = true))}><Icon name="info" size={15} />{t("about")}</button>
             </div>
           {/if}
@@ -412,7 +370,7 @@
     <div class="drop"><div class="dropbox"><Icon name="image" size={42} stroke={1.4} />{t("dropHere")}</div></div>
   {/if}
 
-  <div class="toasts">
+  <div class="toasts" class:compact>
     {#each app.toasts as ts (ts.id)}
       <div class="toast {ts.kind}">
         <Icon name={ts.kind === "ok" ? "ok" : ts.kind === "error" ? "alert" : "info"} size={17} />
@@ -447,6 +405,18 @@
           <span class="muted small">{t("license")}</span>
         </div>
         <button class="btn" onclick={() => (app.dialogs.about = false)}>{t("close")}</button>
+      </div>
+    </div>
+  {/if}
+
+  {#if app.dialogs.prefs}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal-bg" onclick={() => (app.dialogs.prefs = false)}>
+      <div class="modal" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="prefs-title" onclick={(e) => e.stopPropagation()}>
+        <h3 id="prefs-title"><Icon name="sliders" size={18} />{t("appSettings")}</h3>
+        <AppSettings />
+        <div class="mfoot"><button class="btn" onclick={() => (app.dialogs.prefs = false)}>{t("close")}</button></div>
       </div>
     </div>
   {/if}
@@ -554,6 +524,26 @@
   }
   .shell.compact footer:not(:has(.pbar)) {
     display: none;
+  }
+  .shell.compact .dropdown {
+    width: min(290px, calc(100vw - 20px));
+    top: 46px;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+  .shell.compact .dropdown > button {
+    padding: 12px 11px;
+    font-size: 14px;
+  }
+  .shell.compact .wbtns {
+    flex-direction: column;
+    width: 100%;
+  }
+  .shell.compact .wbtns :global(.btn) {
+    justify-content: center;
+  }
+  .shell.compact .wcard h1 {
+    font-size: 24px;
   }
   .m {
     min-height: 0;
@@ -754,18 +744,6 @@
   .dropdown > button:hover {
     background: var(--raised-2);
   }
-  .dcheck {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 6px 9px;
-    font-size: 12px;
-    color: var(--text-2);
-    cursor: pointer;
-  }
-  .dcheck input {
-    margin: 0 1px;
-  }
   .updpill {
     gap: 7px;
   }
@@ -779,75 +757,6 @@
     height: 1px;
     background: var(--line);
     margin: 5px 2px;
-  }
-  .dlabel {
-    font-size: 10.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text-3);
-    padding: 4px 9px 6px;
-  }
-  .q {
-    margin: 0 4px 4px;
-  }
-  .themes {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 2px 9px 4px;
-  }
-  .swatch {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 1px solid var(--line-2);
-    cursor: pointer;
-    position: relative;
-    padding: 0;
-  }
-  .swatch.on {
-    outline: 2px solid var(--text);
-    outline-offset: 2px;
-  }
-  .rgb {
-    position: absolute;
-    right: -3px;
-    bottom: -3px;
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    background: conic-gradient(#f44, #fd4, #4f8, #4af, #a4f, #f44);
-    border: 1px solid var(--surface);
-  }
-  .picker {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--text-2);
-    cursor: pointer;
-  }
-  .picker input {
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 1px solid var(--line-2);
-    border-radius: 50%;
-    background: none;
-    cursor: pointer;
-  }
-  .picker input::-webkit-color-swatch-wrapper {
-    padding: 0;
-  }
-  .picker input::-webkit-color-swatch {
-    border: 0;
-    border-radius: 50%;
-  }
-  .tname {
-    padding: 0 9px 4px;
-    font-size: 11.5px;
-    color: var(--text-3);
   }
   main {
     display: grid;
@@ -1054,6 +963,10 @@
     gap: 8px;
     align-items: center;
   }
+  .toasts.compact {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    width: calc(100vw - 24px);
+  }
   .toast {
     display: flex;
     align-items: center;
@@ -1127,6 +1040,27 @@
   }
   .modal.wide {
     width: 680px;
+  }
+  @media (max-width: 700px) {
+    .modal-bg {
+      align-items: flex-end;
+    }
+    .modal,
+    .modal.wide {
+      width: 100%;
+      max-width: 100%;
+      max-height: 88vh;
+      overflow-y: auto;
+      border-radius: 18px 18px 0 0;
+      padding: 20px 18px calc(18px + env(safe-area-inset-bottom));
+    }
+    .mfoot {
+      flex-wrap: wrap;
+    }
+    .arow {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
   }
   @keyframes pop {
     from {

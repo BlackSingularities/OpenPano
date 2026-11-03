@@ -154,6 +154,7 @@ export const DE: Record<string, string> = {
   showFile: "Datei anzeigen",
   needTwo: "Mindestens 2 Bilder sind erforderlich.",
   warnUnaligned: "Einige Bilder konnten nicht verbunden werden (zu wenige gemeinsame Punkte).",
+  appSettings: "App-Einstellungen",
   menu: "Menü",
   shortcuts: "Tastenkürzel",
   log: "Ereignisprotokoll",

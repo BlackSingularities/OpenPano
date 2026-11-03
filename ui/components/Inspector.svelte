@@ -5,9 +5,10 @@
   import Switch from "./Switch.svelte";
   import Field from "./Field.svelte";
   import Composition from "./Composition.svelte";
+  import AppSettings from "./AppSettings.svelte";
   import { t, lensName } from "../lib/i18n.svelte";
   import type { LensType } from "../lib/geometry";
-  import { S, app, vw, align, busyBlocking, readyIds, persist, viewChanged, buildSphere, setPhotometric, renderAndSave, resolvedFormat, memoryRisk, anyRaw, effectiveProjection, commitHistory } from "../lib/store.svelte";
+  import { S, app, vw, align, busyBlocking, readyIds, persist, viewChanged, buildSphere, setPhotometric, renderAndSave, resolvedFormat, memoryRisk, anyRaw, effectiveProjection, commitHistory, IS_MOBILE } from "../lib/store.svelte";
 
   const s = $derived(S.settings);
   const r = $derived(S.settings.render);
@@ -196,6 +197,12 @@
         <Icon name="download" size={17} />{t("renderSave")} · {fmt === "Dng" ? "DNG" : fmt === "Jpeg" ? "JPEG" : fmt === "Tiff16" ? "TIFF" : fmt === "Exr" ? "EXR" : "PNG"}
       </button>
     </Section>
+
+    {#if IS_MOBILE}
+      <Section title={t("appSettings")} icon="sliders" open={false}>
+        <AppSettings />
+      </Section>
+    {/if}
   </div>
 </aside>
 
