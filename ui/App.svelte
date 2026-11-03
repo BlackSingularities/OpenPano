@@ -437,6 +437,7 @@
         <div class="credit">
           <span>{t("ideaBy")}</span>
           <button class="link big" onclick={() => openUrl(AUTHOR)}>redzikowski.com</button>
+          <button class="link" onclick={() => openUrl("mailto:kontakt@redzikowski.com")}>kontakt@redzikowski.com</button>
         </div>
         <p>{t("aboutText")}</p>
         <div class="arow">
