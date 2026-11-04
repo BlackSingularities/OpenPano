@@ -251,7 +251,7 @@
               <button onclick={() => ((menuOpen = false), (app.dialogs.welcome = true))}><Icon name="info" size={15} />{t("welcomeMenu")}</button>
               {#if !IS_MOBILE}<button onclick={() => ((menuOpen = false), (app.dialogs.shortcuts = true))}><Icon name="keyboard" size={15} />{t("shortcuts")}</button>{/if}
               <button onclick={() => ((menuOpen = false), (app.dialogs.log = true))}><Icon name="list" size={15} />{t("log")}</button>
-              <button onclick={() => ((menuOpen = false), openUrl(REPO))}><Icon name="github" size={15} />{t("projectPage")}</button>
+              <button onclick={() => ((menuOpen = false), openUrl(REPO))}><Icon name="globe" size={15} />{t("projectPage")}</button>
               <button disabled={upd.checking} onclick={() => ((menuOpen = false), manualUpdateCheck())}><Icon name="download" size={15} />{upd.checking ? t("updChecking") : t("updCheck")}</button>
               <button onclick={() => ((menuOpen = false), (app.dialogs.about = true))}><Icon name="info" size={15} />{t("about")}</button>
             </div>
@@ -399,7 +399,7 @@
         </div>
         <p>{t("aboutText")}</p>
         <div class="arow">
-          <button class="btn sm" onclick={() => openUrl(REPO)}><Icon name="github" size={14} />GitHub</button>
+          <button class="btn sm" onclick={() => openUrl(REPO)}><Icon name="globe" size={14} />{t("projectPage")}</button>
           <button class="btn sm" onclick={() => openUrl("https://buycoffee.to/adamredzikowski")}>☕ {t("coffee")}</button>
           <button class="btn sm" disabled={upd.checking} onclick={manualUpdateCheck}><Icon name="download" size={14} />{upd.checking ? t("updChecking") : t("updCheck")}</button>
           <span class="muted small">{t("license")}</span>

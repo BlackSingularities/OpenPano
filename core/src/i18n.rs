@@ -159,7 +159,7 @@ keys! {
     About => "O programie", "About";
     AboutText => "Profesjonalne narzędzie do łączenia zdjęć w panoramy: sferyczne 360°, cylindryczne, prostoliniowe, Panini, little planet i inne. Obsługuje pliki RAW (ARW, NEF, CR2, DNG, RAF, ORF, RW2…) i zapisuje wynik jako liniowy DNG, TIFF, PNG lub JPEG.",
         "Professional panorama stitcher: spherical 360°, cylindrical, rectilinear, Panini, little planet and more. Reads RAW files (ARW, NEF, CR2, DNG, RAF, ORF, RW2…) and writes linear DNG, TIFF, PNG or JPEG.";
-    ProjectPage => "Strona projektu (GitHub)", "Project page (GitHub)";
+    ProjectPage => "Strona projektu", "Project page";
     Log => "Dziennik", "Log";
     ClearLog => "Wyczyść", "Clear";
     Images => "Zdjęcia", "Images";

@@ -32,7 +32,7 @@ export function newer(a: string, b: string): boolean {
 async function assetPattern(): Promise<RegExp | null> {
   const ua = navigator.userAgent;
   if (/android/i.test(ua)) return /android\.apk$/i;
-  if (/iphone|ipad|ipod/i.test(ua)) return null; // sideloaded IPA – release page is the right place
+  if (/iphone|ipad|ipod/i.test(ua)) return null; // iOS: tylko komunikat o nowej wersji
   if (/windows/i.test(ua)) return /setup-x64\.exe$/i;
   return null;
 }
@@ -51,7 +51,7 @@ export async function checkForUpdate(): Promise<boolean> {
     if (version && newer(version, upd.current)) {
       const pat = await assetPattern();
       const asset = pat ? (rel.assets ?? []).find((a: any) => pat.test(a.name)) : null;
-      upd.available = { version, page: rel.html_url, download: asset?.browser_download_url ?? null };
+      upd.available = { version, page: "", download: asset?.browser_download_url ?? null };
     } else upd.available = null;
     upd.lastError = false;
     return true;
@@ -81,5 +81,5 @@ export function startUpdateChecks(enabled: () => boolean) {
 
 export function openUpdate(direct: boolean) {
   const u = upd.available;
-  if (u) openUrl(direct && u.download ? u.download : u.page);
+  if (u && direct && u.download) openUrl(u.download);
 }

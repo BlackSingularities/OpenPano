@@ -1,3 +1,7 @@
+## 2.5.1
+
+- Komunikat o nowej wersji bez listy zmian, linków i informacji, skąd pobierana jest aktualizacja.
+
 ## 2.5.0
 
 - Nowy rodzaj zdjęć **Mozaika (kafelki)** we wszystkich wersjach (Windows, Linux, macOS, Android, CLI `--flat`): łączy płaskie kawałki jednej całości – zdjęcia satelitarne, kafelki mapy, skany dużych dokumentów, zrzuty ekranu – w jeden obraz. Kafelki są tylko przesuwane w tej samej skali, bez perspektywy, dystorsji, winiety i prostowania horyzontu; wynik zawsze w projekcji prostoliniowej, ustawionej na wprost płaszczyzny.

@@ -6,7 +6,6 @@
 
   let { hidden = $bindable(false) }: { hidden?: boolean } = $props();
 
-  const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const show = $derived(!!upd.available && !hidden && S.settings.ui.skippedVersion !== upd.available.version);
 
   function skip() {
@@ -20,9 +19,9 @@
     <span class="ic"><Icon name="download" size={18} /></span>
     <div class="txt">
       <b>{t("updAvailable")}: {upd.available.version}</b>
-      <span>{t("updText")} {upd.current}.{#if IS_IOS} {t("updIos")}{/if}</span>
+      <span>{t("updText")} {upd.current}.</span>
       <div class="btns">
-        <button class="btn primary sm" onclick={() => openUpdate(true)}><Icon name="download" size={14} />{t("updDownload")}</button>
+        {#if upd.available.download}<button class="btn primary sm" onclick={() => openUpdate(true)}><Icon name="download" size={14} />{t("updDownload")}</button>{/if}
         <button class="btn ghost sm" onclick={skip}>{t("updSkip")}</button>
       </div>
     </div>

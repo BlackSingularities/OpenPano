@@ -397,7 +397,6 @@ export const DE: Record<string, string> = {
   updAvailable: "Neue Version verfügbar",
   updText: "Du kannst OpenPano aktualisieren – deine Version:",
   updDownload: "Herunterladen",
-  updNotes: "Was ist neu",
   updSkip: "Diese Version überspringen",
   updLater: "Später",
   updCheck: "Nach Updates suchen",
