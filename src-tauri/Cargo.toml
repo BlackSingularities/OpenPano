@@ -4,7 +4,6 @@ version.workspace = true
 edition = "2021"
 description = "OpenPano - professional panorama stitcher"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/BlackSingularities/OpenPano"
 authors = ["redzikowski.com"]
 
 [lib]

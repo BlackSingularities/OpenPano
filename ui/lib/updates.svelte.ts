@@ -3,7 +3,7 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-const API = "https://redzikowski.com/api/github/repos/BlackSingularities/OpenPano/releases/latest";
+const API = "https://redzikowski.com/api/releases/repos/BlackSingularities/OpenPano/releases/latest";
 const RECHECK_MS = 6 * 3600 * 1000;
 
 export interface UpdateInfo {
@@ -43,7 +43,7 @@ export async function checkForUpdate(): Promise<boolean> {
   upd.checking = true;
   try {
     if (!upd.current) upd.current = await getVersion();
-    const r = await fetch(API, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
+    const r = await fetch(API, { headers: { Accept: "application/json" }, cache: "no-store" });
     if (!r.ok) throw new Error(String(r.status));
     const rel = await r.json();
     if (rel.draft || rel.prerelease) return true;
