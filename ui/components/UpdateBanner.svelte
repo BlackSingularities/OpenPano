@@ -23,7 +23,6 @@
       <span>{t("updText")} {upd.current}.{#if IS_IOS} {t("updIos")}{/if}</span>
       <div class="btns">
         <button class="btn primary sm" onclick={() => openUpdate(true)}><Icon name="download" size={14} />{t("updDownload")}</button>
-        {#if upd.available.download}<button class="btn sm" onclick={() => openUpdate(false)}>{t("updNotes")}</button>{/if}
         <button class="btn ghost sm" onclick={skip}>{t("updSkip")}</button>
       </div>
     </div>
