@@ -36,10 +36,31 @@ if "android.intent.action.SEND" not in m:
     m = m[:i] + FILTERS + "        " + m[i:]
     manifest.write_text(m, encoding="utf-8")
     print("manifest patched")
+# In-app updates: the downloaded APK is installed through PackageInstaller (AppUpdater.kt).
+m = manifest.read_text(encoding="utf-8")
+if "REQUEST_INSTALL_PACKAGES" not in m:
+    m = m.replace("<application", '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n\n    <application', 1)
+if "android.permission.INTERNET" not in m:
+    m = m.replace("<application", '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
+manifest.write_text(m, encoding="utf-8")
 
 KOTLIN = """
+    private var appUpdater: AppUpdater? = null
+
+    override fun onWebViewCreate(webView: android.webkit.WebView) {
+        super.onWebViewCreate(webView)
+        appUpdater = AppUpdater(this, webView, "https://redzikowski.com/api/projects/openpano/asset/")
+        webView.addJavascriptInterface(appUpdater!!, "AppUpdater")
+    }
+
+    override fun onDestroy() {
+        appUpdater?.dispose()
+        super.onDestroy()
+    }
+
     override fun onResume() {
         super.onResume()
+        appUpdater?.onResume()
         panoramerTakeShared(intent)
     }
 
@@ -99,3 +120,8 @@ if "panoramerTakeShared" not in k:
         k = k[: m2.end()] + " {" + KOTLIN + "}\n" + k[m2.end():]
     act.write_text(k, encoding="utf-8")
     print("MainActivity patched:", act)
+
+pkg = re.search(r"(?m)^package\s+([\w.]+)", k).group(1)
+upd = (pathlib.Path(__file__).resolve().parent / "AppUpdater.kt").read_text(encoding="utf-8")
+(act.parent / "AppUpdater.kt").write_text(upd.replace("__PACKAGE__", pkg), encoding="utf-8")
+print("AppUpdater added:", pkg)

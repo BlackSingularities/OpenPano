@@ -417,6 +417,13 @@ const D = {
   updLatest: ["Masz najnowszą wersję", "You have the latest version"],
   updFailed: ["Nie udało się sprawdzić aktualizacji (brak połączenia?)", "Could not check for updates (offline?)"],
   updChecking: ["Sprawdzanie…", "Checking…"],
+  updDownloading: ["Pobieranie aktualizacji", "Downloading update"],
+  updInstalling: ["Instalowanie aktualizacji…", "Installing update…"],
+  updPerm: ["Zezwól OpenPano na instalowanie aplikacji – aktualizacja ruszy sama po powrocie.", "Allow OpenPano to install apps – the update will continue when you return."],
+  updSig: ["Zainstalowana wersja ma inny podpis, więc Android jej nie zaktualizuje. Odinstaluj aplikację i zainstaluj nową wersję (jednorazowo).", "The installed version has a different signature, so Android won't update it. Uninstall the app and install the new version (one-time step)."],
+  updCancelled: ["Instalacja anulowana.", "Installation cancelled."],
+  updInstallFailed: ["Nie udało się zainstalować aktualizacji", "Could not install the update"],
+  updRetry: ["Spróbuj ponownie", "Try again"],
   updIos: ["Zainstaluj nowy plik IPA tak samo jak poprzedni (AltStore / Sideloadly).", "Install the new IPA the same way as before (AltStore / Sideloadly)."],
 } as const;
 

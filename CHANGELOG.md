@@ -1,3 +1,7 @@
+## 2.5.3
+
+- Android: aktualizacja pobiera się w aplikacji (z paskiem postępu) i instaluje przez systemowy instalator pakietów – bez przeglądarki, z czytelnymi komunikatami błędów; po zezwoleniu na instalowanie aplikacji aktualizacja rusza sama.
+
 ## 2.5.2
 
 - Bez żadnych wzmianek o GitHubie w aplikacji: nowy adres serwera aktualizacji, komunikaty błędów bez nazw zewnętrznych serwerów.

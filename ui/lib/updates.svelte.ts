@@ -18,6 +18,10 @@ export const upd = $state({
   checking: false,
   lastError: false,
   lastChecked: 0,
+  /** Android in-app install: "", "downloading", "installing", "permission", "signature", "cancelled", "error". */
+  install: "",
+  progress: -1,
+  installError: "",
 });
 
 function parse(v: string): number[] {
@@ -79,7 +83,40 @@ export function startUpdateChecks(enabled: () => boolean) {
   });
 }
 
+interface AndroidUpdater {
+  download(url: string): string;
+}
+
+/** Android: the APK is downloaded and installed natively (AppUpdater.kt), not through the browser. */
+function androidUpdate(url: string): boolean {
+  const A = (window as any).AppUpdater as AndroidUpdater | undefined;
+  if (!A) return false;
+  (window as any).__appUpdateEvent = (ev: { state: string; p?: number; message?: string }) => {
+    if (ev.state === "progress") {
+      upd.install = "downloading";
+      upd.progress = ev.p ?? -1;
+    } else if (ev.state === "done") upd.install = "";
+    else {
+      upd.install = ev.state;
+      upd.installError = ev.message ?? "";
+    }
+  };
+  upd.installError = "";
+  const r = A.download(url);
+  if (r === "started") {
+    upd.install = "downloading";
+    upd.progress = -1;
+  } else if (r === "permission") upd.install = "permission";
+  else if (r !== "busy") {
+    upd.install = "error";
+    upd.installError = r;
+  }
+  return true;
+}
+
 export function openUpdate(direct: boolean) {
   const u = upd.available;
-  if (u && direct && u.download) openUrl(u.download);
+  if (!u || !direct || !u.download) return;
+  if (/android/i.test(navigator.userAgent) && androidUpdate(u.download)) return;
+  openUrl(u.download);
 }

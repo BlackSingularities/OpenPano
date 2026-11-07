@@ -404,6 +404,13 @@ export const DE: Record<string, string> = {
   updLatest: "Du hast die neueste Version",
   updFailed: "Updates konnten nicht geprüft werden (offline?)",
   updChecking: "Wird geprüft…",
+  updDownloading: "Update wird heruntergeladen",
+  updInstalling: "Update wird installiert…",
+  updPerm: "Erlaube OpenPano, Apps zu installieren – das Update läuft nach der Rückkehr weiter.",
+  updSig: "Die installierte Version hat eine andere Signatur, daher kann Android sie nicht aktualisieren. Deinstalliere die App und installiere die neue Version (einmalig).",
+  updCancelled: "Installation abgebrochen.",
+  updInstallFailed: "Update konnte nicht installiert werden",
+  updRetry: "Erneut versuchen",
   updIos: "Installiere die neue IPA genauso wie die vorherige (AltStore / Sideloadly).",
 };
 

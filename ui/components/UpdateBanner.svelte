@@ -19,11 +19,24 @@
     <span class="ic"><Icon name="download" size={18} /></span>
     <div class="txt">
       <b>{t("updAvailable")}: {upd.available.version}</b>
-      <span>{t("updText")} {upd.current}.</span>
-      <div class="btns">
-        {#if upd.available.download}<button class="btn primary sm" onclick={() => openUpdate(true)}><Icon name="download" size={14} />{t("updDownload")}</button>{/if}
-        <button class="btn ghost sm" onclick={skip}>{t("updSkip")}</button>
-      </div>
+      {#if upd.install === "downloading"}
+        <span>{t("updDownloading")}{upd.progress >= 0 ? ` ${Math.floor(upd.progress * 100)}%` : "…"}</span>
+        <div class="bar"><i style:width={upd.progress >= 0 ? `${upd.progress * 100}%` : "30%"}></i></div>
+      {:else if upd.install === "installing"}
+        <span>{t("updInstalling")}</span>
+      {:else}
+        <span>
+          {#if upd.install === "permission"}{t("updPerm")}
+          {:else if upd.install === "signature"}{t("updSig")}
+          {:else if upd.install === "cancelled"}{t("updCancelled")}
+          {:else if upd.install === "error"}{t("updInstallFailed")}{upd.installError ? `: ${upd.installError}` : ""}
+          {:else}{t("updText")} {upd.current}.{/if}
+        </span>
+        <div class="btns">
+          {#if upd.available.download}<button class="btn primary sm" onclick={() => openUpdate(true)}><Icon name="download" size={14} />{t(upd.install ? "updRetry" : "updDownload")}</button>{/if}
+          <button class="btn ghost sm" onclick={skip}>{t("updSkip")}</button>
+        </div>
+      {/if}
     </div>
     <button class="btn ghost sm icon" data-tip={t("updLater")} aria-label={t("updLater")} onclick={() => (hidden = true)}><Icon name="x" size={14} /></button>
   </div>
@@ -83,6 +96,19 @@
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 7px;
+  }
+  .bar {
+    height: 4px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--line-2);
+    overflow: hidden;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    background: var(--sel-fg);
+    transition: width 0.2s;
   }
   @keyframes pop {
     from {
