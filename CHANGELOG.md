@@ -1,3 +1,8 @@
+## 2.6.0
+
+- Zgłaszanie błędów i sugestii: nowa pozycja „Zgłoś błąd lub sugestię” – opis trafia prosto do autora przez redzikowski.com, e-mail jest opcjonalny.
+- Po nieoczekiwanym zamknięciu aplikacja przy następnym uruchomieniu proponuje wysłanie raportu o błędzie – tylko za zgodą użytkownika.
+
 ## 2.5.3
 
 - Android: aktualizacja pobiera się w aplikacji (z paskiem postępu) i instaluje przez systemowy instalator pakietów – bez przeglądarki, z czytelnymi komunikatami błędów; po zezwoleniu na instalowanie aplikacji aktualizacja rusza sama.

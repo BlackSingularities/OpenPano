@@ -401,6 +401,7 @@ export const DE: Record<string, string> = {
   updLater: "Später",
   updCheck: "Nach Updates suchen",
   updAuto: "Automatisch prüfen",
+  reportProblem: "Fehler melden oder Funktion vorschlagen",
   updLatest: "Du hast die neueste Version",
   updFailed: "Updates konnten nicht geprüft werden (offline?)",
   updChecking: "Wird geprüft…",

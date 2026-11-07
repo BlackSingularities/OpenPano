@@ -2,6 +2,7 @@
   import { t } from "../lib/i18n.svelte";
   import { THEMES, type ThemeId } from "../lib/theme";
   import { S, setLanguage, persist, buildSphere, IS_MOBILE, setTheme } from "../lib/store.svelte";
+  import { openFeedback } from "../lib/feedback.js";
 
   function setQuality(q: "fast" | "normal" | "high") {
     S.settings.ui.quality = q;
@@ -55,6 +56,8 @@
   <label class="check">
     <input type="checkbox" bind:checked={S.settings.ui.checkUpdates} onchange={persist} />{t("updAuto")}
   </label>
+
+  <button class="btn ghost" onclick={() => openFeedback()}>{t("reportProblem")}</button>
 </div>
 
 <style>

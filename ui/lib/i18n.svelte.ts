@@ -414,6 +414,7 @@ const D = {
   updLater: ["Później", "Later"],
   updCheck: ["Sprawdź aktualizacje", "Check for updates"],
   updAuto: ["Sprawdzaj automatycznie", "Check automatically"],
+  reportProblem: ["Zgłoś błąd lub sugestię", "Report a problem or suggest a feature"],
   updLatest: ["Masz najnowszą wersję", "You have the latest version"],
   updFailed: ["Nie udało się sprawdzić aktualizacji (brak połączenia?)", "Could not check for updates (offline?)"],
   updChecking: ["Sprawdzanie…", "Checking…"],

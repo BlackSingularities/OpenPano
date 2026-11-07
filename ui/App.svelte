@@ -13,7 +13,9 @@
   import UpdateBanner from "./components/UpdateBanner.svelte";
   import AppSettings from "./components/AppSettings.svelte";
   import { upd, startUpdateChecks, checkForUpdate } from "./lib/updates.svelte";
-  import { t } from "./lib/i18n.svelte";
+  import { initFeedback } from "./lib/feedback.js";
+  import { getVersion } from "@tauri-apps/api/app";
+  import { t, getLang } from "./lib/i18n.svelte";
   import {
     S, app, vw, init, addPaths, pickFiles, pickFolder, align, renderAndSave, cancelJob, busyBlocking, readyIds,
     hasUnsavedWork, undo, redo, fitView, nudgeView, viewChanged, resetView, persist, dismissToast, IS_MOBILE, toast,
@@ -79,6 +81,7 @@
 
   onMount(() => {
     init();
+    initFeedback({ app: "openpano", appName: "OpenPano", version: () => getVersion(), lang: () => getLang() });
     startUpdateChecks(() => S.settings.ui.checkUpdates);
     const tick = setInterval(() => (now = Date.now()), 500);
     const unsubs: (() => void)[] = [];
