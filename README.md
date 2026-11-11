@@ -1,3 +1,11 @@
+
+<!-- posters:start -->
+<p align="center">
+  <img src="docs/posters/windows.png" alt="OpenPano – Windows" width="460">
+</p>
+
+<p align="center"><a href="https://redzikowski.com/portfolio/openpano">redzikowski.com/portfolio/openpano</a></p>
+<!-- posters:end -->
 <p align="center"><img src="assets/icon256.png" width="128" alt="OpenPano"></p>
 
 <h1 align="center">OpenPano</h1>

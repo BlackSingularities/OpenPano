@@ -1,0 +1,22 @@
+{
+  "slug": "openpano",
+  "name": "OpenPano",
+  "label": "łączenie zdjęć w panoramy",
+  "icon": "icon.png",
+  "url": "https://redzikowski.com/portfolio/openpano",
+  "posters": [
+    {
+      "platform": "windows",
+      "file": "windows.png",
+      "title": "Panorama *z kilku kadrów*",
+      "lead": "Wrzucasz zdjęcia, program sam je dopasowuje i skleja bez widocznych szwów – także z plików RAW, z wynikiem w DNG.",
+      "shots": [
+        { "src": "../screenshots/windows/01-panorama.png", "caption": "Pięć kadrów, jedna panorama" },
+        { "src": "../screenshots/windows/02-kadry.png", "caption": "Obrysy dopasowanych zdjęć" },
+        { "src": "../screenshots/windows/03-zdjecia.png", "caption": "Jakość 100/100, błąd 0,6 px" }
+      ],
+      "features": ["RAW z kilkunastu aparatów", "wynik w liniowym DNG", "11 projekcji", "szwy bez duchów", "panoramy 360° z GPano", "mała planeta"],
+      "meta": "Windows 10 i 11"
+    }
+  ]
+}
