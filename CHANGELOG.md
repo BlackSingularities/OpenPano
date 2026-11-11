@@ -1,3 +1,7 @@
+## 2.6.1
+
+- Android: dodawanie zdjęć z galerii znów działa – wcześniej każde zdjęcie kończyło się błędem „expected raw body”.
+
 ## 2.6.0
 
 - Zgłaszanie błędów i sugestii: nowa pozycja „Zgłoś błąd lub sugestię” – opis trafia prosto do autora przez redzikowski.com, e-mail jest opcjonalny.
