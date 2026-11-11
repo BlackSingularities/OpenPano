@@ -124,17 +124,40 @@ pub fn cache_dir(app: AppHandle) -> Res<String> {
     Ok(d.to_string_lossy().to_string())
 }
 
-/// Import an image sent as raw bytes (mobile content URIs). Header `x-name` carries the file
-/// name. The file is stored in the cache directory and loaded like a normal path.
+/// Import an image sent from the UI (mobile content URIs). The file is stored in the cache
+/// directory and loaded like a normal path.
+///
+/// Two body shapes are accepted:
+/// - raw bytes with the file name in the `x-name` header (iOS, desktop – custom protocol IPC),
+/// - JSON `{ "name": "…", "data": "<base64>" }` (Android: Tauri never uses the custom protocol
+///   there, every payload goes through postMessage as JSON, so raw bytes and headers are lost).
 #[tauri::command]
 pub fn add_image_bytes(app: AppHandle, state: State<'_, Shared>, request: tauri::ipc::Request<'_>) -> Res<Vec<Added>> {
-    let name = request
+    let header_name = request
         .headers()
         .get("x-name")
         .and_then(|v| v.to_str().ok())
-        .map(|s| percent_decode(s))
-        .unwrap_or_else(|| "image.jpg".into());
-    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("expected raw body".into()) };
+        .map(|s| percent_decode(s));
+    let (name, decoded): (Option<String>, Option<Vec<u8>>) = match request.body() {
+        tauri::ipc::InvokeBody::Raw(_) => (header_name, None),
+        tauri::ipc::InvokeBody::Json(v) => {
+            let name = v.get("name").and_then(|n| n.as_str()).map(str::to_owned).or(header_name);
+            let bytes = if let Some(b64) = v.get("data").and_then(|d| d.as_str()) {
+                base64::engine::general_purpose::STANDARD.decode(b64).map_err(err)?
+            } else {
+                // tablica liczb – tak Tauri serializuje Uint8Array w JSON
+                serde_json::from_value::<Vec<u8>>(v.get("data").cloned().unwrap_or_else(|| v.clone()))
+                    .map_err(|_| "unsupported image payload".to_string())?
+            };
+            (name, Some(bytes))
+        }
+    };
+    let name = name.unwrap_or_else(|| "image.jpg".into());
+    let bytes: &[u8] = match (&decoded, request.body()) {
+        (Some(b), _) => b,
+        (None, tauri::ipc::InvokeBody::Raw(b)) => b,
+        (None, _) => return Err("empty image payload".into()),
+    };
     let dir = app.path().app_cache_dir().map_err(err)?.join("import");
     std::fs::create_dir_all(&dir).map_err(err)?;
     let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' }).collect();

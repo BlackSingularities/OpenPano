@@ -374,14 +374,30 @@ function fileName(uri: string): string {
   return s.includes(":") ? s.split(":").pop()! : s;
 }
 
-/** Mobile: content URIs are read in the UI and streamed to the engine as raw bytes. */
+const IS_ANDROID = /android/i.test(navigator.userAgent);
+
+/** Base64 w kawałkach – `String.fromCharCode(...bajty)` całego zdjęcia przepełniłby stos. */
+function toBase64(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/**
+ * Mobile: content URIs are read in the UI and sent to the engine.
+ * iOS: raw bytes + `x-name` header. Android: Tauri always goes through postMessage (JSON),
+ * where raw bytes and headers do not survive, so the name and base64 data travel in the body.
+ */
 async function importUris(uris: string[]) {
   if (app.job && app.job.kind !== "load" && app.job.kind !== "sphere") return;
   app.job = { kind: "load", stage: t("stageLoading"), fraction: 0, started: Date.now() };
   for (const [i, uri] of uris.entries()) {
     try {
       const bytes = await readFile(uri);
-      const added = await invoke<{ id: number; path: string; name: string }[]>("add_image_bytes", bytes, { headers: { "x-name": encodeURIComponent(fileName(uri)) } });
+      const name = fileName(uri);
+      const added = IS_ANDROID
+        ? await invoke<{ id: number; path: string; name: string }[]>("add_image_bytes", { name, data: toBase64(bytes) })
+        : await invoke<{ id: number; path: string; name: string }[]>("add_image_bytes", bytes, { headers: { "x-name": encodeURIComponent(name) } });
       for (const a of added) app.images.push({ ...a, status: "loading", width: 0, height: 0, isRaw: false, summary: "", camera: "", thumb: "", enabled: true });
       invalidateAlignment();
     } catch (e) {
